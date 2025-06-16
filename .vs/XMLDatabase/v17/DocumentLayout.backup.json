@@ -1,0 +1,163 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "C:\\Users\\dhama\\source\\repos\\XMLDatabase\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{E8CA9744-76C6-4D01-8737-945B10865BB2}|XMLDatabase\\XMLDatabase.csproj|c:\\users\\dhama\\source\\repos\\xmldatabase\\xmldatabase\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{E8CA9744-76C6-4D01-8737-945B10865BB2}|XMLDatabase\\XMLDatabase.csproj|solutionrelative:xmldatabase\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{E8CA9744-76C6-4D01-8737-945B10865BB2}|XMLDatabase\\XMLDatabase.csproj|c:\\users\\dhama\\source\\repos\\xmldatabase\\xmldatabase\\cls_xmlprocessor.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{E8CA9744-76C6-4D01-8737-945B10865BB2}|XMLDatabase\\XMLDatabase.csproj|solutionrelative:xmldatabase\\cls_xmlprocessor.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{E8CA9744-76C6-4D01-8737-945B10865BB2}|XMLDatabase\\XMLDatabase.csproj|c:\\users\\dhama\\source\\repos\\xmldatabase\\xmldatabase\\ml1.consumption.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{E8CA9744-76C6-4D01-8737-945B10865BB2}|XMLDatabase\\XMLDatabase.csproj|solutionrelative:xmldatabase\\ml1.consumption.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{E8CA9744-76C6-4D01-8737-945B10865BB2}|XMLDatabase\\XMLDatabase.csproj|c:\\users\\dhama\\source\\repos\\xmldatabase\\xmldatabase\\ml1.mbconfig||{93FA4DC3-61EC-47AF-B0BA-50CAD3CAF049}",
+      "RelativeMoniker": "D:0:0:{E8CA9744-76C6-4D01-8737-945B10865BB2}|XMLDatabase\\XMLDatabase.csproj|solutionrelative:xmldatabase\\ml1.mbconfig||{93FA4DC3-61EC-47AF-B0BA-50CAD3CAF049}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{E8CA9744-76C6-4D01-8737-945B10865BB2}|XMLDatabase\\XMLDatabase.csproj|c:\\users\\dhama\\source\\repos\\xmldatabase\\xmldatabase\\app.config||{FA3CD31E-987B-443A-9B81-186104E8DAC1}",
+      "RelativeMoniker": "D:0:0:{E8CA9744-76C6-4D01-8737-945B10865BB2}|XMLDatabase\\XMLDatabase.csproj|solutionrelative:xmldatabase\\app.config||{FA3CD31E-987B-443A-9B81-186104E8DAC1}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{E8CA9744-76C6-4D01-8737-945B10865BB2}|XMLDatabase\\XMLDatabase.csproj|c:\\users\\dhama\\source\\repos\\xmldatabase\\xmldatabase\\cls_databaseconnector.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{E8CA9744-76C6-4D01-8737-945B10865BB2}|XMLDatabase\\XMLDatabase.csproj|solutionrelative:xmldatabase\\cls_databaseconnector.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{E8CA9744-76C6-4D01-8737-945B10865BB2}|XMLDatabase\\XMLDatabase.csproj|c:\\users\\dhama\\source\\repos\\xmldatabase\\xmldatabase\\xmldatabase.csproj||{04B8AB82-A572-4FEF-95CE-5222444B6B64}|",
+      "RelativeMoniker": "D:0:0:{E8CA9744-76C6-4D01-8737-945B10865BB2}|XMLDatabase\\XMLDatabase.csproj|solutionrelative:xmldatabase\\xmldatabase.csproj||{04B8AB82-A572-4FEF-95CE-5222444B6B64}|"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{E8CA9744-76C6-4D01-8737-945B10865BB2}|XMLDatabase\\XMLDatabase.csproj|c:\\users\\dhama\\source\\repos\\xmldatabase\\xmldatabase\\cls_nodesrecolector.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{E8CA9744-76C6-4D01-8737-945B10865BB2}|XMLDatabase\\XMLDatabase.csproj|solutionrelative:xmldatabase\\cls_nodesrecolector.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 0,
+      "VerticalTabListWidth": 256,
+      "DocumentGroups": [
+        {
+          "DockedWidth": 200,
+          "SelectedChildIndex": 6,
+          "Children": [
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "cls_XMLProcessor.cs",
+              "DocumentMoniker": "C:\\Users\\dhama\\source\\repos\\XMLDatabase\\XMLDatabase\\cls_XMLProcessor.cs",
+              "RelativeDocumentMoniker": "XMLDatabase\\cls_XMLProcessor.cs",
+              "ToolTip": "C:\\Users\\dhama\\source\\repos\\XMLDatabase\\XMLDatabase\\cls_XMLProcessor.cs",
+              "RelativeToolTip": "XMLDatabase\\cls_XMLProcessor.cs",
+              "ViewState": "AgIAAAkAAAAAAAAAAAAAAC4AAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-06-15T23:31:39.728Z",
+              "IsPinned": true,
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "ML1.consumption.cs",
+              "DocumentMoniker": "C:\\Users\\dhama\\source\\repos\\XMLDatabase\\XMLDatabase\\ML1.consumption.cs",
+              "RelativeDocumentMoniker": "XMLDatabase\\ML1.consumption.cs",
+              "ToolTip": "C:\\Users\\dhama\\source\\repos\\XMLDatabase\\XMLDatabase\\ML1.consumption.cs",
+              "RelativeToolTip": "XMLDatabase\\ML1.consumption.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAgAAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-06-16T01:35:30.133Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 3,
+              "Title": "ML1.mbconfig",
+              "DocumentMoniker": "C:\\Users\\dhama\\source\\repos\\XMLDatabase\\XMLDatabase\\ML1.mbconfig",
+              "RelativeDocumentMoniker": "XMLDatabase\\ML1.mbconfig",
+              "ToolTip": "C:\\Users\\dhama\\source\\repos\\XMLDatabase\\XMLDatabase\\ML1.mbconfig",
+              "RelativeToolTip": "XMLDatabase\\ML1.mbconfig",
+              "Icon": "7f5c38b0-f0bc-4551-a9a8-b4f467cc4670.000012|",
+              "WhenOpened": "2025-06-16T01:10:51.326Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:1:0:{3ae79031-e1bc-11d0-8f78-00a0c9110057}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{1c4feeaa-4718-4aa9-859d-94ce25d182ba}"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 6,
+              "Title": "XMLDatabase",
+              "DocumentMoniker": "C:\\Users\\dhama\\source\\repos\\XMLDatabase\\XMLDatabase\\XMLDatabase.csproj",
+              "RelativeDocumentMoniker": "XMLDatabase\\XMLDatabase.csproj",
+              "ToolTip": "C:\\Users\\dhama\\source\\repos\\XMLDatabase\\XMLDatabase\\XMLDatabase.csproj",
+              "RelativeToolTip": "XMLDatabase\\XMLDatabase.csproj",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000758|",
+              "WhenOpened": "2025-06-16T00:57:17.77Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "Program.cs",
+              "DocumentMoniker": "C:\\Users\\dhama\\source\\repos\\XMLDatabase\\XMLDatabase\\Program.cs",
+              "RelativeDocumentMoniker": "XMLDatabase\\Program.cs",
+              "ToolTip": "C:\\Users\\dhama\\source\\repos\\XMLDatabase\\XMLDatabase\\Program.cs",
+              "RelativeToolTip": "XMLDatabase\\Program.cs",
+              "ViewState": "AgIAAAkAAAAAAAAAAAAUwCAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-06-16T00:46:03.73Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 5,
+              "Title": "cls_DatabaseConnector.cs",
+              "DocumentMoniker": "C:\\Users\\dhama\\source\\repos\\XMLDatabase\\XMLDatabase\\cls_DatabaseConnector.cs",
+              "RelativeDocumentMoniker": "XMLDatabase\\cls_DatabaseConnector.cs",
+              "ToolTip": "C:\\Users\\dhama\\source\\repos\\XMLDatabase\\XMLDatabase\\cls_DatabaseConnector.cs",
+              "RelativeToolTip": "XMLDatabase\\cls_DatabaseConnector.cs",
+              "ViewState": "AgIAAAIAAAAAAAAAAAAcwA8AAAASAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-06-15T23:32:38.162Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 7,
+              "Title": "cls_NodesRecolector.cs",
+              "DocumentMoniker": "C:\\Users\\dhama\\source\\repos\\XMLDatabase\\XMLDatabase\\cls_NodesRecolector.cs",
+              "RelativeDocumentMoniker": "XMLDatabase\\cls_NodesRecolector.cs",
+              "ToolTip": "C:\\Users\\dhama\\source\\repos\\XMLDatabase\\XMLDatabase\\cls_NodesRecolector.cs",
+              "RelativeToolTip": "XMLDatabase\\cls_NodesRecolector.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAGoCAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-06-15T23:32:04.465Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 4,
+              "Title": "App.config",
+              "DocumentMoniker": "C:\\Users\\dhama\\source\\repos\\XMLDatabase\\XMLDatabase\\App.config",
+              "RelativeDocumentMoniker": "XMLDatabase\\App.config",
+              "ToolTip": "C:\\Users\\dhama\\source\\repos\\XMLDatabase\\XMLDatabase\\App.config",
+              "RelativeToolTip": "XMLDatabase\\App.config",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAABQAAAAWAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000601|",
+              "WhenOpened": "2025-06-15T23:30:48.736Z",
+              "EditorCaption": ""
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
