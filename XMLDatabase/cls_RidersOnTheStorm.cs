@@ -64,45 +64,85 @@ namespace XMLDatabase
                     var xmlsDelRfc = mapaDeTrabajo[rfc];
                     mdl_NAcumulados oDataAcumulada = null;
 
+                    documentosExistentes.TryGetValue(rfc, out var docExistente);
+                    var uuidsExistentes = new HashSet<string>(docExistente?.lsUUID ?? new List<string>());
+
                     foreach (var xml in xmlsDelRfc)
                     {
+                        string uuid = ExtraerUuidDelXml(xml);
+                        if (string.IsNullOrWhiteSpace(uuid) || uuidsExistentes.Contains(uuid))
+                        {
+                            continue; 
+                        }
+
                         mdl_NAcumulados oData = DeserializarYProcesarXml(xml, sMes);
-                        if (oDataAcumulada == null) oDataAcumulada = oData;
+                        if (oDataAcumulada == null)
+                        {
+                            oDataAcumulada = oData;
+                        }
                         else
                         {
+                            // Lógica de acumulación en memoria detallada
                             oDataAcumulada.Nomina.fTotalPercepciones00 += oData.Nomina.fTotalPercepciones00;
                             oDataAcumulada.Nomina.fTotalDeducciones00 += oData.Nomina.fTotalDeducciones00;
                             oDataAcumulada.Nomina.fTotalOtrosPagos00 += oData.Nomina.fTotalOtrosPagos00;
                             oDataAcumulada.lsUUID.AddRange(oData.lsUUID);
-                            // ... Acumulación en memoria de otros campos necesarios ...
+
+                            // Acumulación para Percepciones
+                            if (oData.Nomina.oPercepciones != null)
+                            {
+                                if (oDataAcumulada.Nomina.oPercepciones == null) oDataAcumulada.Nomina.oPercepciones = oData.Nomina.oPercepciones;
+                                else
+                                {
+                                    oDataAcumulada.Nomina.oPercepciones.fTotalSueldos00 += oData.Nomina.oPercepciones.fTotalSueldos00;
+                                    oDataAcumulada.Nomina.oPercepciones.fTotalGravado00 += oData.Nomina.oPercepciones.fTotalGravado00;
+                                    oDataAcumulada.Nomina.oPercepciones.fTotalExento00 += oData.Nomina.oPercepciones.fTotalExento00;
+
+                                    var percepcionesAcumuladasMap = oDataAcumulada.Nomina.oPercepciones.lsPercepcion.ToDictionary(p => p.sClave);
+                                    foreach (var nuevaPercepcion in oData.Nomina.oPercepciones.lsPercepcion ?? new List<PercepcionMBDB>())
+                                    {
+                                        if (percepcionesAcumuladasMap.TryGetValue(nuevaPercepcion.sClave, out var percepcionExistente))
+                                        {
+                                            percepcionExistente.fGravado00 += nuevaPercepcion.fGravado00;
+                                            percepcionExistente.fExento00 += nuevaPercepcion.fExento00;
+                                        }
+                                        else
+                                        {
+                                            oDataAcumulada.Nomina.oPercepciones.lsPercepcion.Add(nuevaPercepcion);
+                                        }
+                                    }
+                                }
+                            }
+                            // Aquí iría la misma lógica de acumulación para Deducciones, OtrosPagos, etc.
                         }
                     }
 
-                    if (documentosExistentes.TryGetValue(rfc, out var docExistente))
-                    {
-                        var updates = new List<UpdateDefinition<mdl_NAcumulados>>();
-                        var arrayFilters = new List<ArrayFilterDefinition>();
+                    if (oDataAcumulada == null) continue;
 
-                        // --- Lógica de Actualización Detallada ---
-                        updates.Add(Builders<mdl_NAcumulados>.Update
+                    if (docExistente != null)
+                    {
+                        var arrayFilters = new List<ArrayFilterDefinition>();
+                        var updatesParaCombinar = new List<UpdateDefinition<mdl_NAcumulados>>();
+
+                        var updateBuilder = Builders<mdl_NAcumulados>.Update
                             .Inc("Nomina.TotalPercepciones00", (double)oDataAcumulada.Nomina.fTotalPercepciones00)
                             .Inc($"Nomina.TotalPercepciones{sMes:D2}", (double)oDataAcumulada.Nomina.fTotalPercepciones00)
                             .Inc("Nomina.TotalDeducciones00", (double)oDataAcumulada.Nomina.fTotalDeducciones00)
                             .Inc($"Nomina.TotalDeducciones{sMes:D2}", (double)oDataAcumulada.Nomina.fTotalDeducciones00)
                             .Inc("Nomina.TotalOtrosPagos00", (double)oDataAcumulada.Nomina.fTotalOtrosPagos00)
                             .Inc($"Nomina.TotalOtrosPagos{sMes:D2}", (double)oDataAcumulada.Nomina.fTotalOtrosPagos00)
-                            .PushEach(doc => doc.lsUUID, oDataAcumulada.lsUUID));
+                            .PushEach(doc => doc.lsUUID, oDataAcumulada.lsUUID);
 
                         if (oDataAcumulada.Nomina.oPercepciones != null)
                         {
                             var oPercepciones = oDataAcumulada.Nomina.oPercepciones;
-                            updates.Add(Builders<mdl_NAcumulados>.Update
+                            updateBuilder = updateBuilder
                                 .Inc("Nomina.Percepciones.TotalSueldos00", (double)oPercepciones.fTotalSueldos00)
                                 .Inc($"Nomina.Percepciones.TotalSueldos{sMes:D2}", (double)oPercepciones.fTotalSueldos00)
                                 .Inc("Nomina.Percepciones.TotalGravado00", (double)oPercepciones.fTotalGravado00)
                                 .Inc($"Nomina.Percepciones.TotalGravado{sMes:D2}", (double)oPercepciones.fTotalGravado00)
                                 .Inc("Nomina.Percepciones.TotalExento00", (double)oPercepciones.fTotalExento00)
-                                .Inc($"Nomina.Percepciones.TotalExento{sMes:D2}", (double)oPercepciones.fTotalExento00));
+                                .Inc($"Nomina.Percepciones.TotalExento{sMes:D2}", (double)oPercepciones.fTotalExento00);
 
                             var lsClavesExistentes = docExistente.Nomina?.oPercepciones?.lsPercepcion.Select(p => p.sClave).ToHashSet() ?? new HashSet<string>();
                             var nuevosConceptosP = new List<PercepcionMBDB>();
@@ -112,7 +152,7 @@ namespace XMLDatabase
                                 {
                                     string sFiltro = $"elemP{p.sClave.Replace("_", "")}";
                                     arrayFilters.Add(new BsonDocumentArrayFilterDefinition<BsonDocument>(new BsonDocument(sFiltro + ".Clave", p.sClave)));
-                                    updates.Add(Builders<mdl_NAcumulados>.Update
+                                    updatesParaCombinar.Add(Builders<mdl_NAcumulados>.Update
                                         .Inc($"Nomina.Percepciones.Percepcion.$[{sFiltro}].Gravado00", (double)p.fGravado00)
                                         .Inc($"Nomina.Percepciones.Percepcion.$[{sFiltro}].Exento00", (double)p.fExento00)
                                         .Inc($"Nomina.Percepciones.Percepcion.$[{sFiltro}].Gravado{sMes:D2}", (double)p.fGravado00)
@@ -120,12 +160,14 @@ namespace XMLDatabase
                                 }
                                 else { nuevosConceptosP.Add(p); }
                             }
-                            if (nuevosConceptosP.Any()) { updates.Add(Builders<mdl_NAcumulados>.Update.PushEach("Nomina.Percepciones.Percepcion", nuevosConceptosP)); }
+                            if (nuevosConceptosP.Any())
+                            {
+                                updateBuilder = updateBuilder.PushEach("Nomina.Percepciones.Percepcion", nuevosConceptosP);
+                            }
                         }
 
-                        // Aquí iría la misma lógica para Deducciones, OtrosPagos, Incapacidades, etc.
-
-                        var combinedUpdate = Builders<mdl_NAcumulados>.Update.Combine(updates);
+                        updatesParaCombinar.Insert(0, updateBuilder);
+                        var combinedUpdate = Builders<mdl_NAcumulados>.Update.Combine(updatesParaCombinar);
                         var filter = Builders<mdl_NAcumulados>.Filter.Eq(doc => doc.sRFC, rfc);
 
                         var updateModel = new UpdateOneModel<mdl_NAcumulados>(filter, combinedUpdate);
@@ -150,6 +192,7 @@ namespace XMLDatabase
 
         // Funciones hipotéticas que deben ser implementadas
         private string ExtraerRfcDelXml(byte[] xmlBytes) { /* ... Lógica para leer el RFC eficientemente ... */ return "RFC_EJEMPLO"; }
+        private string ExtraerUuidDelXml(byte[] xmlBytes) { /* ... Lógica para leer el UUID eficientemente sin deserializar todo el XML ... */ return "UUID_EJEMPLO"; }
         private mdl_NAcumulados DeserializarYProcesarXml(byte[] xmlBytes, string sMes) { /* ... Lógica de deserialización ... */ return new mdl_NAcumulados(); }
     }
 }

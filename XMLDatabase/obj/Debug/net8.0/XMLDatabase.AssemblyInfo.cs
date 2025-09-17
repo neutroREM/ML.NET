@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("XMLDatabase")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+a48e2bbad6576fffdfe5da231c653a6084433b46")]
 [assembly: System.Reflection.AssemblyProductAttribute("XMLDatabase")]
 [assembly: System.Reflection.AssemblyTitleAttribute("XMLDatabase")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

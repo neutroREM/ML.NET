@@ -8,5 +8,6 @@
         public string sProceso { get; set; } = string.Empty;
         public string NombreEmisor { get; set; } = string.Empty;
         public List<byte[]> lsyXMLs { get; set; } = new List<byte[]>();
+        public string sPeriodo { get; set; } = string.Empty;
     }
 }

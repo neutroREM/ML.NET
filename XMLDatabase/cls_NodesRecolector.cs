@@ -50,6 +50,7 @@ namespace XMLDatabase
         {
             PercepcionesMBDB oPercepcion = null;
             List<PercepcionMBDB> lsPercepcion = new List<PercepcionMBDB>();
+            List<HorasExtraMBDB> lsHorasExtra = new List<HorasExtraMBDB>();
             /*Preguntar si esta bien validar varias veces el mismo objeto*/
             if (oNominaXML12C.Percepciones != null)
             {
@@ -164,16 +165,14 @@ namespace XMLDatabase
                         {
                             //HorasExtraMBDB NHorasExtra = null;
 
-                            string sTipoHoras = string.Empty;
+
 
                             foreach (var horaextra in concepto.HorasExtra)
                             {
 
                                 var NHorasExtra = new HorasExtraMBDB
                                 {
-                                    iDias00 = horaextra.Dias,
-                                    iHorasExtra00 = horaextra.HorasExtra,
-                                    fImportePagado00 = horaextra.ImportePagado,
+                                    sTipoHoraExtra = horaextra.TipoHoras,
                                 };
 
                                 string propDias = $"iDias{sMes:D2}";
@@ -183,7 +182,7 @@ namespace XMLDatabase
 
 
 
-                                var typeHorasExtra = typeof(HorasExtraMBDB);
+                                var typeHorasExtra = typeof(HoraExtraMBDB);
 
                                 var propertyDias = typeHorasExtra.GetProperty(propDias);
                                 var propertyHorasExtra = typeHorasExtra.GetProperty(propHorasExtra);
@@ -193,32 +192,32 @@ namespace XMLDatabase
 
                                 if (propertyDias != null)
                                 {
-                                    propertyDias.SetValue(NHorasExtra, horaextra.Dias);
+                                    propertyDias.SetValue(NHorasExtra.oHoraExtra, horaextra.Dias);
                                 }
 
                                 if (propertyHorasExtra != null)
                                 {
-                                    propertyHorasExtra.SetValue(NHorasExtra, horaextra.HorasExtra);
+                                    propertyHorasExtra.SetValue(NHorasExtra.oHoraExtra, horaextra.HorasExtra);
                                 }
 
                                 if (propertyImportePagado != null)
                                 {
-                                    propertyImportePagado.SetValue(NHorasExtra, horaextra.ImportePagado);
+                                    propertyImportePagado.SetValue(NHorasExtra.oHoraExtra, horaextra.ImportePagado);
                                 }
 
                                 if (propertyTipoHora != null)
                                 {
-                                    propertyTipoHora.SetValue(NHorasExtra, horaextra.TipoHoras);
+                                    propertyTipoHora.SetValue(NHorasExtra.oHoraExtra, horaextra.TipoHoras);
                                 }
 
 
+                                lsHorasExtra.Add(NHorasExtra);
 
-                                oDataPercepciones.oHorasExtra = NHorasExtra;
                             }
 
                         }
                         else
-                            oDataPercepciones.oHorasExtra = null;
+                            oDataPercepciones.lsHorasExtra = lsHorasExtra;
 
                         lsPercepcion.Add(NPercepcion);
                     }
@@ -657,6 +656,7 @@ namespace XMLDatabase
         {
             PercepcionesMBDB oPercepcion = null;
             List<PercepcionMBDB> lsPercepcion = new List<PercepcionMBDB>();
+            List<HorasExtraMBDB> lsHorasExtra = new List<HorasExtraMBDB>();
             /*Preguntar si esta bien validar varias veces el mismo objeto*/
             if (oNominaXML12B.Percepciones != null)
             {
@@ -771,16 +771,14 @@ namespace XMLDatabase
                         {
                             //HorasExtraMBDB NHorasExtra = null;
 
-                            string sTipoHoras = string.Empty;
+
 
                             foreach (var horaextra in concepto.HorasExtra)
                             {
 
                                 var NHorasExtra = new HorasExtraMBDB
                                 {
-                                    iDias00 = horaextra.Dias,
-                                    iHorasExtra00 = horaextra.HorasExtra,
-                                    fImportePagado00 = horaextra.ImportePagado,
+                                    sTipoHoraExtra = horaextra.TipoHoras,
                                 };
 
                                 string propDias = $"iDias{sMes:D2}";
@@ -790,7 +788,7 @@ namespace XMLDatabase
 
 
 
-                                var typeHorasExtra = typeof(HorasExtraMBDB);
+                                var typeHorasExtra = typeof(HoraExtraMBDB);
 
                                 var propertyDias = typeHorasExtra.GetProperty(propDias);
                                 var propertyHorasExtra = typeHorasExtra.GetProperty(propHorasExtra);
@@ -800,32 +798,32 @@ namespace XMLDatabase
 
                                 if (propertyDias != null)
                                 {
-                                    propertyDias.SetValue(NHorasExtra, horaextra.Dias);
+                                    propertyDias.SetValue(NHorasExtra.oHoraExtra, horaextra.Dias);
                                 }
 
                                 if (propertyHorasExtra != null)
                                 {
-                                    propertyHorasExtra.SetValue(NHorasExtra, horaextra.HorasExtra);
+                                    propertyHorasExtra.SetValue(NHorasExtra.oHoraExtra, horaextra.HorasExtra);
                                 }
 
                                 if (propertyImportePagado != null)
                                 {
-                                    propertyImportePagado.SetValue(NHorasExtra, horaextra.ImportePagado);
+                                    propertyImportePagado.SetValue(NHorasExtra.oHoraExtra, horaextra.ImportePagado);
                                 }
 
                                 if (propertyTipoHora != null)
                                 {
-                                    propertyTipoHora.SetValue(NHorasExtra, horaextra.TipoHoras);
+                                    propertyTipoHora.SetValue(NHorasExtra.oHoraExtra, horaextra.TipoHoras);
                                 }
 
 
+                                lsHorasExtra.Add(NHorasExtra);
 
-                                oDataPercepciones.oHorasExtra = NHorasExtra;
                             }
 
                         }
                         else
-                            oDataPercepciones.oHorasExtra = null;
+                            oDataPercepciones.lsHorasExtra = lsHorasExtra;
 
                         lsPercepcion.Add(NPercepcion);
                     }
@@ -1264,6 +1262,8 @@ namespace XMLDatabase
         {
             PercepcionesMBDB oPercepcion = null;
             List<PercepcionMBDB> lsPercepcion = new List<PercepcionMBDB>();
+            List<HorasExtraMBDB> lsHorasExtra= new List<HorasExtraMBDB>();
+
             /*Preguntar si esta bien validar varias veces el mismo objeto*/
             if (oNominaXML12A.Percepciones != null)
             {
@@ -1378,16 +1378,14 @@ namespace XMLDatabase
                         {
                             //HorasExtraMBDB NHorasExtra = null;
 
-                            string sTipoHoras = string.Empty;
+                 
 
                             foreach (var horaextra in concepto.HorasExtra)
                             {
 
                                 var NHorasExtra = new HorasExtraMBDB
                                 {
-                                    iDias00 = horaextra.Dias,
-                                    iHorasExtra00 = horaextra.HorasExtra,
-                                    fImportePagado00 = horaextra.ImportePagado,
+                                    sTipoHoraExtra = horaextra.TipoHoras,
                                 };
 
                                 string propDias = $"iDias{sMes:D2}";
@@ -1397,7 +1395,7 @@ namespace XMLDatabase
 
 
 
-                                var typeHorasExtra = typeof(HorasExtraMBDB);
+                                var typeHorasExtra = typeof(HoraExtraMBDB);
 
                                 var propertyDias = typeHorasExtra.GetProperty(propDias);
                                 var propertyHorasExtra = typeHorasExtra.GetProperty(propHorasExtra);
@@ -1407,32 +1405,32 @@ namespace XMLDatabase
 
                                 if (propertyDias != null)
                                 {
-                                    propertyDias.SetValue(NHorasExtra, horaextra.Dias);
+                                    propertyDias.SetValue(NHorasExtra.oHoraExtra, horaextra.Dias);
                                 }
 
                                 if (propertyHorasExtra != null)
                                 {
-                                    propertyHorasExtra.SetValue(NHorasExtra, horaextra.HorasExtra);
+                                    propertyHorasExtra.SetValue(NHorasExtra.oHoraExtra, horaextra.HorasExtra);
                                 }
 
                                 if (propertyImportePagado != null)
                                 {
-                                    propertyImportePagado.SetValue(NHorasExtra, horaextra.ImportePagado);
+                                    propertyImportePagado.SetValue(NHorasExtra.oHoraExtra, horaextra.ImportePagado);
                                 }
 
                                 if (propertyTipoHora != null)
                                 {
-                                    propertyTipoHora.SetValue(NHorasExtra, horaextra.TipoHoras);
+                                    propertyTipoHora.SetValue(NHorasExtra.oHoraExtra, horaextra.TipoHoras);
                                 }
 
 
-
-                                oDataPercepciones.oHorasExtra = NHorasExtra;
+                                lsHorasExtra.Add(NHorasExtra);
+                             
                             }
 
                         }
                         else
-                            oDataPercepciones.oHorasExtra = null;
+                            oDataPercepciones.lsHorasExtra = lsHorasExtra;
 
                         lsPercepcion.Add(NPercepcion);
                     }

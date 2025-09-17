@@ -329,7 +329,7 @@ namespace XMLDatabase
         public AccionesOTitulosMBDB oAccionesOTitulos { get; set; }
 
         [BsonElement("HorasExtra", Order = 8)]
-        public HorasExtraMBDB oHorasExtra { get; set; }
+        public List<HorasExtraMBDB> lsHorasExtra { get; set; }
 
         [BsonElement("JubilacionPensionRetiro", Order = 9)]
         public JubilacionPensionRetiroMBDB oJubilacionPensionRetiro { get; set; }
@@ -583,7 +583,7 @@ namespace XMLDatabase
         {
             lsPercepcion = new List<PercepcionMBDB>();
             oAccionesOTitulos = new AccionesOTitulosMBDB();
-            oHorasExtra = new HorasExtraMBDB();
+            lsHorasExtra = new List<HorasExtraMBDB>();
             oJubilacionPensionRetiro = new JubilacionPensionRetiroMBDB();
             oSeparacionIndemnizacion = new SeparacionIndemnizacionMBDB();
             //}
@@ -842,6 +842,56 @@ namespace XMLDatabase
     ////Percepcion-019
     public class HorasExtraMBDB
     {
+
+
+        [BsonElement("Tipo", Order = 1)]
+        public string sTipoHoraExtra { get; set; } 
+
+        [BsonElement("HoraExtra", Order = 2)]
+        public HoraExtraMBDB oHoraExtra { get; set; }
+
+
+        //[BsonElement("TipoHora01")]
+        //public string sTipoHora01 { get; set; } = string.Empty;
+
+        //[BsonElement("TipoHora02")]
+        //public string sTipoHora02 { get; set; } = string.Empty;
+
+        //[BsonElement("TipoHora03")]
+        //public string sTipoHora03 { get; set; } = string.Empty;
+
+        //[BsonElement("TipoHora04")]
+        //public string sTipoHora04 { get; set; } = string.Empty;
+
+        //[BsonElement("TipoHora05")]
+        //public string sTipoHora05 { get; set; } = string.Empty;
+
+        //[BsonElement("TipoHora06")]
+        //public string sTipoHora06 { get; set; } = string.Empty;
+
+        //[BsonElement("TipoHora07")]
+        //public string sTipoHora07 { get; set; } = string.Empty;
+
+        //[BsonElement("TipoHora08")]
+        //public string sTipoHora08 { get; set; } = string.Empty;
+        //[BsonElement("TipoHora09")]
+        //public string sTipoHora09 { get; set; } = string.Empty;
+        //[BsonElement("TipoHora10")]
+        //public string sTipoHora10 { get; set; } = string.Empty;
+
+        //[BsonElement("TipoHora11")]
+        //public string sTipoHora11 { get; set; } = string.Empty;
+        //[BsonElement("TipoHora12")]
+        //public string sTipoHora12 { get; set; } = string.Empty;
+        public HorasExtraMBDB()
+        {
+            sTipoHoraExtra = string.Empty;
+            oHoraExtra = new HoraExtraMBDB();
+        }
+    }
+
+    public class HoraExtraMBDB
+    {
         /*Horas Extra*/
         [BsonElement("Dias00")]
         public int iDias00 { get; set; }
@@ -954,39 +1004,6 @@ namespace XMLDatabase
         [BsonElement("ImportePagado12")]
         [BsonRepresentation(BsonType.Decimal128)]
         public decimal fImportePagado12 { get; set; }
-
-        [BsonElement("TipoHora01")]
-        public string sTipoHora01 { get; set; } = string.Empty;
-
-        [BsonElement("TipoHora02")]
-        public string sTipoHora02 { get; set; } = string.Empty;
-
-        [BsonElement("TipoHora03")]
-        public string sTipoHora03 { get; set; } = string.Empty;
-
-        [BsonElement("TipoHora04")]
-        public string sTipoHora04 { get; set; } = string.Empty;
-
-        [BsonElement("TipoHora05")]
-        public string sTipoHora05 { get; set; } = string.Empty;
-
-        [BsonElement("TipoHora06")]
-        public string sTipoHora06 { get; set; } = string.Empty;
-
-        [BsonElement("TipoHora07")]
-        public string sTipoHora07 { get; set; } = string.Empty;
-
-        [BsonElement("TipoHora08")]
-        public string sTipoHora08 { get; set; } = string.Empty;
-        [BsonElement("TipoHora09")]
-        public string sTipoHora09 { get; set; } = string.Empty;
-        [BsonElement("TipoHora10")]
-        public string sTipoHora10 { get; set; } = string.Empty;
-
-        [BsonElement("TipoHora11")]
-        public string sTipoHora11 { get; set; } = string.Empty;
-        [BsonElement("TipoHora12")]
-        public string sTipoHora12 { get; set; } = string.Empty;
     }
 
     //Percepcion- 039, 044,

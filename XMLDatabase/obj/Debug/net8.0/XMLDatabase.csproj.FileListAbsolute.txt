@@ -62,3 +62,4 @@ C:\Users\dhama\source\repos\XMLDatabase\XMLDatabase\bin\Debug\net8.0\runtimes\li
 C:\Users\dhama\source\repos\XMLDatabase\XMLDatabase\bin\Debug\net8.0\runtimes\osx-x64\native\libFastTreeNative.dylib
 C:\Users\dhama\source\repos\XMLDatabase\XMLDatabase\bin\Debug\net8.0\runtimes\win-x64\native\FastTreeNative.dll
 C:\Users\dhama\source\repos\XMLDatabase\XMLDatabase\bin\Debug\net8.0\runtimes\win-x86\native\FastTreeNative.dll
+C:\Users\dhama\source\repos\XMLDatabase\XMLDatabase\obj\Debug\net8.0\XMLDatabase.sourcelink.json

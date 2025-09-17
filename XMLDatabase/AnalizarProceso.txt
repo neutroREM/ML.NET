@@ -1,0 +1,962 @@
+        public async Task ProcesarLoteNominas_Escalable(mdl_XMLData oNominaData)
+        {
+            string sRFColaborador = string.Empty;
+            string sUUID = string.Empty;
+            string sVersionCFDI = string.Empty;
+            string sNombreColaborador = string.Empty;
+            string sMes = oNominaData.sMesXML;
+
+
+            try
+            {
+                if (oMongoConnection != null)
+                {
+                    _NAcumuladosCollection = oMongoConnection.GetCollection<mdl_NAcumulados>($"{sCollectionName}_{oNominaData.sPeriodo}");
+
+
+                    var mapaDeTrabajo = new Dictionary<string, List<byte[]>>();
+                    foreach (var xmlBytes in oNominaData.lsyXMLs)
+                    {
+                        (sRFColaborador, sVersionCFDI, sNombreColaborador, sUUID) = ExtraerRfcDelXml(xmlBytes);
+                        if (!mapaDeTrabajo.ContainsKey(sRFColaborador))
+                        {
+                            mapaDeTrabajo[sRFColaborador] = new List<byte[]>();
+                        }
+                        mapaDeTrabajo[sRFColaborador].Add(xmlBytes);
+                    }
+
+
+                    const int TAMANO_LOTE = 500; // Se puede ajustar el tamaño del lote
+                    var listaDeRfcs = mapaDeTrabajo.Keys.ToList();
+
+
+
+                    for (int i = 0; i < listaDeRfcs.Count; i += TAMANO_LOTE)
+                    {
+                        var lsLoteCFDIProcesar = listaDeRfcs.Skip(i).Take(TAMANO_LOTE);
+                        var operacionesBulk = new List<WriteModel<mdl_NAcumulados>>();
+
+                        var filterLote = Builders<mdl_NAcumulados>.Filter.In(doc => doc.sRFC, lsLoteCFDIProcesar);
+                        var dicDocumentosExistentes = (await _NAcumuladosCollection.Find(filterLote).ToListAsync()).ToDictionary(doc => doc.sRFC);
+
+                        foreach (var rfc in lsLoteCFDIProcesar)
+                        {
+                            var xmlsDelRfc = mapaDeTrabajo[rfc];
+
+                            mdl_NAcumulados oDataAcumulada = null;
+
+                            dicDocumentosExistentes.TryGetValue(rfc, out var docExiste);
+
+                            var hsUUIDExistentes = new HashSet<string>(docExiste?.lsUUID ?? new List<string>());
+
+                            foreach (var xml in xmlsDelRfc)
+                            {
+                                if (string.IsNullOrEmpty(sUUID) || hsUUIDExistentes.Contains(sUUID))
+                                    continue;
+
+                                mdl_NAcumulados oData = await DeserializarYProcesarXml(xml, sMes, sVersionCFDI);
+
+                                if (oDataAcumulada == null)
+                                {
+                                    oDataAcumulada = oData;
+                                }
+                                else
+                                {
+                                    // Nomina
+                                    oDataAcumulada.Nomina.fNetoTotal00 += oData.Nomina.fNetoTotal00;
+                                    oDataAcumulada.Nomina.fTotalPercepciones00 += oData.Nomina.fTotalPercepciones00;
+                                    oDataAcumulada.Nomina.fTotalDeducciones00 += oData.Nomina.fTotalDeducciones00;
+                                    oDataAcumulada.Nomina.fTotalOtrosPagos00 += oData.Nomina.fTotalOtrosPagos00;
+                                    oDataAcumulada.lsUUID.Add(sUUID);
+
+                                    string propNetoTotal = $"fNetoTotal{sMes:D2}";
+                                    string propTotalPercepciones = $"fTotalPercepciones{sMes:D2}";
+                                    string propTotalDeducciones = $"fTotalDeducciones{sMes:D2}";
+                                    string propTotalOtrosPagos = $"fTotalOtrosPagos{sMes:D2}";
+
+                                    var typeNom = typeof(mdl_NominaMBDB);
+
+                                    var propertyNetoTotal = typeNom.GetProperty(propNetoTotal);
+                                    var propertyTotalPercepciones = typeNom.GetProperty(propTotalPercepciones);
+                                    var propertyTotalDeducciones = typeNom.GetProperty(propTotalDeducciones);
+                                    var propertyTotalOtrosPagos = typeNom.GetProperty(propTotalOtrosPagos);
+
+                                    if (propertyNetoTotal != null)
+                                    {
+                                        var NetoToalsNew = Convert.ToDecimal(propertyNetoTotal.GetValue(oData.Nomina));
+                                        var NetoTotalExist = Convert.ToDecimal(propertyNetoTotal.GetValue(oDataAcumulada.Nomina));
+
+                                        var fNetoTotal = NetoToalsNew += NetoTotalExist;
+                                        propertyNetoTotal.SetValue(oDataAcumulada.Nomina, fNetoTotal);
+                                    }
+
+                                    if (propertyTotalPercepciones != null)
+                                    {
+                                        var TotalPercepcionesNew = Convert.ToDecimal(propertyTotalPercepciones.GetValue(oData.Nomina));
+                                        var TotalPercepcionesExist = Convert.ToDecimal(propertyTotalPercepciones.GetValue(oDataAcumulada.Nomina));
+
+                                        var fTotalPercepciones = TotalPercepcionesNew += TotalPercepcionesExist;
+                                        propertyTotalPercepciones.SetValue(oDataAcumulada.Nomina, fTotalPercepciones);
+                                    }
+
+                                    if (propertyTotalDeducciones != null)
+                                    {
+                                        var TotalDeduccionesNew = Convert.ToDecimal(propertyTotalDeducciones.GetValue(oData.Nomina));
+                                        var TotalDeduccionesExist = Convert.ToDecimal(propertyTotalDeducciones.GetValue(oDataAcumulada.Nomina));
+
+                                        var fTotalDeducciones = TotalDeduccionesNew += TotalDeduccionesExist;
+
+                                        propertyTotalDeducciones.SetValue(oDataAcumulada.Nomina, fTotalDeducciones);
+
+                                    }
+
+                                    if (propertyTotalOtrosPagos != null)
+                                    {
+                                        var TotalOtrosPagosNew = Convert.ToDecimal(propertyTotalOtrosPagos.GetValue(oData.Nomina));
+                                        var TotalOtrosPagosExist = Convert.ToDecimal(propertyTotalOtrosPagos.GetValue(oDataAcumulada.Nomina));
+
+                                        var fTotalOtrosPagos = TotalOtrosPagosNew += TotalOtrosPagosExist;
+
+                                        propertyTotalOtrosPagos.SetValue(oDataAcumulada.Nomina, fTotalOtrosPagos);
+
+                                    }
+
+                                    // Percepciones
+                                    if (oData.Nomina.oPercepciones != null)
+                                    {
+                                        oDataAcumulada.Nomina.oPercepciones.fTotalExento00 += oData.Nomina.oPercepciones.fTotalExento00;
+                                        oDataAcumulada.Nomina.oPercepciones.fTotalGravado00 += oData.Nomina.oPercepciones.fTotalGravado00;
+                                        oDataAcumulada.Nomina.oPercepciones.fTotalJubilacionPensionRetiro00 += oData.Nomina.oPercepciones.fTotalJubilacionPensionRetiro00;
+                                        oDataAcumulada.Nomina.oPercepciones.fTotalSeparacionIndemnizacion00 += oData.Nomina.oPercepciones.fTotalSeparacionIndemnizacion00;
+                                        oDataAcumulada.Nomina.oPercepciones.fTotalSueldos00 += oData.Nomina.oPercepciones.fTotalSueldos00;
+
+                                        string propTotalExento = $"fTotalExento{sMes:D2}";
+                                        string propTotalGravado = $"fTotalGravado{sMes:D2}";
+                                        string propTotalJubilacionPensionRetiro = $"fTotalJubilacionPensionRetiro{sMes:D2}";
+                                        string propTotalSeparacionIndemnizacion = $"fTotalSeparacionIndemnizacion{sMes:D2}";
+                                        string propTotalSueldos = $"fTotalSueldos{sMes:D2}";
+
+                                        var typePercep = typeof(PercepcionesMBDB);
+                                        var propertyTotalExento = typePercep.GetProperty(propTotalExento);
+                                        var propertyTotalGravado = typePercep.GetProperty(propTotalGravado);
+                                        var propertyTotalJPR = typePercep.GetProperty(propTotalJubilacionPensionRetiro);
+                                        var propertyTotalSI = typePercep.GetProperty(propTotalSeparacionIndemnizacion);
+                                        var propertyTotalSueldos = typePercep.GetProperty(propTotalSueldos);
+
+                                        if (propertyTotalExento != null)
+                                        {
+
+                                            var TotalExentoNew = Convert.ToDecimal(propertyTotalExento.GetValue(oData.Nomina.oPercepciones));
+                                            var TotalExentoExist = Convert.ToDecimal(propertyTotalExento.GetValue(oDataAcumulada.Nomina.oPercepciones));
+
+                                            var fTotalExento = TotalExentoNew += TotalExentoExist;
+                                            propertyTotalExento.SetValue(oDataAcumulada.Nomina.oPercepciones, fTotalExento);
+                                        }
+
+                                        if (propertyTotalGravado != null)
+                                        {
+                                            var TotalGravadoNew = Convert.ToDecimal(propertyTotalGravado.GetValue(oData.Nomina.oPercepciones));
+                                            var TotalGravadoExist = Convert.ToDecimal(propertyTotalGravado.GetValue(oDataAcumulada.Nomina.oPercepciones));
+
+                                            var fTotalGravado = TotalGravadoNew += TotalGravadoExist;
+                                            propertyTotalGravado.SetValue(oDataAcumulada.Nomina.oPercepciones, fTotalGravado);
+                                        }
+
+                                        if (propertyTotalJPR != null)
+                                        {
+                                            var TotalJPRNew = Convert.ToDecimal(propertyTotalJPR.GetValue(oData.Nomina.oPercepciones));
+                                            var TotalJPRExist = Convert.ToDecimal(propertyTotalJPR.GetValue(oDataAcumulada.Nomina.oPercepciones));
+                                            var fTotalJPR = TotalJPRNew += TotalJPRExist;
+                                            propertyTotalJPR.SetValue(oDataAcumulada.Nomina.oPercepciones, fTotalJPR);
+
+                                        }
+
+                                        if (propertyTotalSI != null)
+                                        {
+                                            var TotalSINew = Convert.ToDecimal(propertyTotalSI.GetValue(oData.Nomina.oPercepciones));
+                                            var TotalSIExist = Convert.ToDecimal(propertyTotalSI.GetValue(oDataAcumulada.Nomina.oPercepciones));
+                                            var fTotalSI = TotalSINew += TotalSIExist;
+
+                                            propertyTotalSI.SetValue(oDataAcumulada.Nomina.oPercepciones, fTotalSI);
+
+                                        }
+
+                                        if (propertyTotalSueldos != null)
+                                        {
+                                            var TotalSueldosNew = Convert.ToDecimal(propertyTotalSueldos.GetValue(oData.Nomina.oPercepciones));
+                                            var TotalSueldosExist = Convert.ToDecimal(propertyTotalSueldos.GetValue(oDataAcumulada.Nomina.oPercepciones));
+                                            var fTotalSueldos = TotalSueldosNew += TotalSueldosExist;
+                                            propertyTotalSueldos.SetValue(oDataAcumulada.Nomina.oPercepciones, fTotalSueldos);
+
+                                        }
+
+                                        // BEGIN CHANGE: Corregido el error de conflicto en la operacion Bulk
+                                        // Percepcion
+                                        if (oData.Nomina.oPercepciones.lsPercepcion != null && oData.Nomina.oPercepciones.lsPercepcion.Count > 0)
+                                        {
+                                            if (oDataAcumulada.Nomina.oPercepciones.lsPercepcion == null)
+                                                oDataAcumulada.Nomina.oPercepciones.lsPercepcion = new List<PercepcionMBDB>();
+
+                                            if (oDataAcumulada.Nomina.oPercepciones.lsPercepcion.Count == 0)
+                                            {
+                                                oDataAcumulada.Nomina.oPercepciones.lsPercepcion.AddRange(oData.Nomina.oPercepciones.lsPercepcion);
+                                            }
+                                            else
+                                            {
+                                                var percepcionesAcumuladas = oDataAcumulada.Nomina.oPercepciones.lsPercepcion.ToDictionary(p => p.sClave);
+
+                                                foreach (var nuevaPercepcion in oData.Nomina.oPercepciones.lsPercepcion)
+                                                {
+                                                    if (percepcionesAcumuladas.TryGetValue(nuevaPercepcion.sClave, out var percepcionExistente))
+                                                    {
+                                                        percepcionExistente.fExento00 += nuevaPercepcion.fExento00;
+                                                        percepcionExistente.fGravado00 += nuevaPercepcion.fGravado00;
+
+                                                        string propExento = $"fExento{sMes:D2}";
+                                                        string propGravado = $"fGravado{sMes:D2}";
+                                                        var typeP = typeof(PercepcionMBDB);
+                                                        var propertyGravado = typeP.GetProperty(propGravado);
+                                                        var propertyExento = typeP.GetProperty(propExento);
+
+                                                        if (propertyGravado != null)
+                                                        {
+                                                            var fGravadoAcumulado = Convert.ToDecimal(propertyGravado.GetValue(percepcionExistente));
+                                                            var fNuevoGravado = Convert.ToDecimal(propertyGravado.GetValue(nuevaPercepcion));
+                                                            var fSumaGravado = fGravadoAcumulado + fNuevoGravado;
+                                                            propertyGravado.SetValue(percepcionExistente, fSumaGravado);
+                                                        }
+
+                                                        if (propertyExento != null)
+                                                        {
+                                                            var fExentoAcumulado = Convert.ToDecimal(propertyExento.GetValue(percepcionExistente));
+                                                            var fExentoGravado = Convert.ToDecimal(propertyExento.GetValue(nuevaPercepcion));
+                                                            var fSumaExento = fExentoAcumulado + fExentoGravado;
+                                                            propertyExento.SetValue(percepcionExistente, fSumaExento);
+                                                        }
+                                                    }
+                                                    else
+                                                    {
+                                                        oDataAcumulada.Nomina.oPercepciones.lsPercepcion.Add(nuevaPercepcion);
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        // END CHANGE
+
+                                        // AccionesOTitulose
+                                        if (oData.Nomina.oPercepciones.oAccionesOTitulos != null)
+                                        {
+                                            var accionesOTitulosNew = oData;
+                                            if (oDataAcumulada.Nomina.oPercepciones.oAccionesOTitulos != null)
+                                            {
+                                                var accionesOTitulosExist = oDataAcumulada;
+
+                                                oDataAcumulada.Nomina.oPercepciones.oAccionesOTitulos.fValorMercado00 = oData.Nomina.oPercepciones.oAccionesOTitulos.fValorMercado00;
+                                                oDataAcumulada.Nomina.oPercepciones.oAccionesOTitulos.fPrecioAlOtorgarse00 = oData.Nomina.oPercepciones.oAccionesOTitulos.fPrecioAlOtorgarse00;
+
+
+                                                string propValorMercado = $"fValorMercado{sMes:D2}";
+                                                string propPrecioAlOtorgarse = $"fPrecioAlOtorgarse{sMes:D2}";
+
+
+                                                var typeAOT = typeof(AccionesOTitulosMBDB);
+                                                var propertyValorMercado = typeAOT.GetProperty(propValorMercado);
+                                                var propertyPrecioAlOtorgarse = typeAOT.GetProperty(propPrecioAlOtorgarse);
+
+
+                                                if (propertyValorMercado != null)
+                                                {
+                                                    var VaorMercadoNew = Convert.ToDecimal(propertyValorMercado.GetValue(oData.Nomina.oPercepciones.oAccionesOTitulos));
+                                                    var ValorMercadoExist = Convert.ToDecimal(propertyValorMercado.GetValue(oDataAcumulada.Nomina.oPercepciones.oAccionesOTitulos));
+                                                    var fValorMercado = VaorMercadoNew += ValorMercadoExist;
+
+                                                    propertyValorMercado.SetValue(oDataAcumulada.Nomina.oPercepciones.oAccionesOTitulos, fValorMercado);
+
+                                                }
+
+                                                if (propertyPrecioAlOtorgarse != null)
+                                                {
+
+                                                    var PAONew = Convert.ToDecimal(propertyPrecioAlOtorgarse.GetValue(oData.Nomina.oPercepciones.oAccionesOTitulos));
+                                                    var PAOExist = Convert.ToDecimal(propertyPrecioAlOtorgarse.GetValue(oDataAcumulada.Nomina.oPercepciones.oAccionesOTitulos));
+                                                    var fPAO = PAONew += PAOExist;
+
+
+                                                    propertyPrecioAlOtorgarse.SetValue(oDataAcumulada.Nomina.oPercepciones.oAccionesOTitulos, fPAO);
+
+                                                }
+                                            }
+                                            else
+                                                oDataAcumulada.Nomina.oPercepciones.oAccionesOTitulos = oData.Nomina.oPercepciones.oAccionesOTitulos;
+
+                                        }
+
+                                        // Horas Extra
+                                        if (oData.Nomina.oPercepciones.lsHorasExtra != null && oData.Nomina.oPercepciones.lsHorasExtra.Count > 0)
+                                        {
+                                            if (oDataAcumulada.Nomina.oPercepciones.lsHorasExtra == null || oDataAcumulada.Nomina.oPercepciones.lsHorasExtra.Count == 0)
+                                            {
+                                                oDataAcumulada.Nomina.oPercepciones.lsHorasExtra.AddRange(oData.Nomina.oPercepciones.lsHorasExtra);
+                                            }
+                                            else
+                                            {
+                                                var horasExtraAcumuladas = oDataAcumulada.Nomina.oPercepciones.lsHorasExtra.ToDictionary(h => h.sTipoHoraExtra);
+                                                foreach (var nuevaHoraExtra in oData.Nomina.oPercepciones.lsHorasExtra)
+                                                {
+                                                    if (horasExtraAcumuladas.TryGetValue(nuevaHoraExtra.sTipoHoraExtra, out var horaExtraExistente))
+                                                    {
+                                                        horaExtraExistente.oHoraExtra.fImportePagado00 = nuevaHoraExtra.oHoraExtra.fImportePagado00;
+                                                        horaExtraExistente.oHoraExtra.iDias00 = nuevaHoraExtra.oHoraExtra.iDias00;
+                                                        horaExtraExistente.oHoraExtra.iHorasExtra00 = nuevaHoraExtra.oHoraExtra.iHorasExtra00;
+
+                                                        string propDias = $"iDias{sMes:D2}";
+                                                        string propHorasExtra = $"iHorasExtra{sMes:D2}";
+                                                        string propImportePagado = $"fImportePagado{sMes:D2}";
+
+                                                        var typeHoraExtra = typeof(HoraExtraMBDB);
+                                                        var propertyDias = typeHoraExtra.GetProperty(propDias);
+                                                        var propertyHorasExtra = typeHoraExtra.GetProperty(propHorasExtra);
+                                                        var propertyImportePagado = typeHoraExtra.GetProperty(propImportePagado);
+
+                                                    }
+                                                    else
+                                                        oDataAcumulada.Nomina.oPercepciones.lsHorasExtra.Add(nuevaHoraExtra);
+                                                }
+                                            }
+                                        }
+
+                                        // JubilacionPensionRetiro
+                                        if (oData.Nomina.oPercepciones.oJubilacionPensionRetiro != null)
+                                        {
+                                            if (oDataAcumulada != null)
+                                            {
+                                                oDataAcumulada.Nomina.oPercepciones.oJubilacionPensionRetiro.fTotalUnaExhibicion00 = oData.Nomina.oPercepciones.oJubilacionPensionRetiro.fTotalUnaExhibicion00;
+                                                oDataAcumulada.Nomina.oPercepciones.oJubilacionPensionRetiro.fTotalParcialidad00 = oData.Nomina.oPercepciones.oJubilacionPensionRetiro.fTotalParcialidad00;
+                                                oDataAcumulada.Nomina.oPercepciones.oJubilacionPensionRetiro.fMontoDiario00 = oData.Nomina.oPercepciones.oJubilacionPensionRetiro.fMontoDiario00;
+                                                oDataAcumulada.Nomina.oPercepciones.oJubilacionPensionRetiro.fIngresoAcumulable00 = oData.Nomina.oPercepciones.oJubilacionPensionRetiro.fIngresoAcumulable00;
+                                                oDataAcumulada.Nomina.oPercepciones.oJubilacionPensionRetiro.fIngresoNoAcumulable00 = oData.Nomina.oPercepciones.oJubilacionPensionRetiro.fIngresoNoAcumulable00;
+
+
+                                                string propTotalUnaExhibicion = $"fTotalUnaExhibicion{sMes:D2}";
+                                                string propTotalParcialidad = $"fTotalParcialidad{sMes:D2}";
+                                                string propMontoDiario = $"fMontoDiario{sMes:D2}";
+                                                string propIngresoAcumulableJPR = $"fIngresoAcumulable{sMes:D2}";
+                                                string propIngresoNoAcumulableJPR = $"fIngresoNoAcumulable{sMes:D2}";
+
+                                                var typeJPR = typeof(JubilacionPensionRetiroMBDB);
+                                                var propertyTotalUnaExhibicion = typeJPR.GetProperty(propTotalUnaExhibicion);
+                                                var propertyTotalParcialidad = typeJPR.GetProperty(propTotalParcialidad);
+                                                var propertyMontoDiario = typeJPR.GetProperty(propMontoDiario);
+                                                var propertyIngresoAcumulableJPR = typeJPR.GetProperty(propIngresoAcumulableJPR);
+                                                var propertyIngresoNoAcumulableJPR = typeJPR.GetProperty(propIngresoNoAcumulableJPR);
+
+                                                if (propertyTotalUnaExhibicion != null)
+                                                {
+
+                                                    var TotalUnaExhibicionNew = Convert.ToDecimal(propertyTotalUnaExhibicion.GetValue(oData.Nomina.oPercepciones.oJubilacionPensionRetiro));
+                                                    var TotalUnaExhibiconExist = Convert.ToDecimal(propertyTotalUnaExhibicion.GetValue(oDataAcumulada.Nomina.oPercepciones.oJubilacionPensionRetiro));
+
+                                                    var fTotalExento = TotalUnaExhibiconExist += TotalUnaExhibicionNew;
+                                                    propertyTotalUnaExhibicion.SetValue(oDataAcumulada.Nomina.oPercepciones.oJubilacionPensionRetiro, fTotalExento);
+                                                }
+
+                                                if (propertyTotalParcialidad != null)
+                                                {
+                                                    var TotalGravadoNew = Convert.ToDecimal(propertyTotalParcialidad.GetValue(oData.Nomina.oPercepciones.oJubilacionPensionRetiro));
+                                                    var TotalGravadoExist = Convert.ToDecimal(propertyTotalParcialidad.GetValue(oDataAcumulada.Nomina.oPercepciones.oJubilacionPensionRetiro));
+
+                                                    var fTotalGravado = TotalGravadoNew += TotalGravadoExist;
+                                                    propertyTotalParcialidad.SetValue(oDataAcumulada.Nomina.oPercepciones.oJubilacionPensionRetiro, fTotalGravado);
+                                                }
+
+                                                if (propertyMontoDiario != null)
+                                                {
+                                                    var TotalMontoDiarioJPRNew = Convert.ToDecimal(propertyMontoDiario.GetValue(oData.Nomina.oPercepciones.oJubilacionPensionRetiro));
+                                                    var TotalMontoDiarioJPRExist = Convert.ToDecimal(propertyMontoDiario.GetValue(oDataAcumulada.Nomina.oPercepciones.oJubilacionPensionRetiro));
+                                                    var fTotalMontoDiarioJPR = TotalMontoDiarioJPRNew += TotalMontoDiarioJPRExist;
+                                                    propertyMontoDiario.SetValue(oDataAcumulada.Nomina.oPercepciones.oJubilacionPensionRetiro, fTotalMontoDiarioJPR);
+
+                                                }
+
+                                                if (propertyIngresoAcumulableJPR != null)
+                                                {
+                                                    var TotalIngresoAcumulableJPRNew = Convert.ToDecimal(propertyIngresoAcumulableJPR.GetValue(oData.Nomina.oPercepciones.oJubilacionPensionRetiro));
+                                                    var TotalIngresoAcumulableJPRExist = Convert.ToDecimal(propertyIngresoAcumulableJPR.GetValue(oDataAcumulada.Nomina.oPercepciones.oJubilacionPensionRetiro));
+                                                    var fTotalIngresoAcumulableJPR = TotalIngresoAcumulableJPRNew += TotalIngresoAcumulableJPRExist;
+
+
+                                                    propertyIngresoAcumulableJPR.SetValue(oDataAcumulada.Nomina.oPercepciones.oJubilacionPensionRetiro, fTotalIngresoAcumulableJPR);
+
+                                                }
+
+                                                if (propertyIngresoNoAcumulableJPR != null)
+                                                {
+                                                    var TotalIngresoNoAcumulableJPRNew = Convert.ToDecimal(propertyIngresoNoAcumulableJPR.GetValue(oData.Nomina.oPercepciones.oJubilacionPensionRetiro));
+                                                    var TotalIngresoNoAcumulableJPRExist = Convert.ToDecimal(propertyIngresoNoAcumulableJPR.GetValue(oDataAcumulada.Nomina.oPercepciones.oJubilacionPensionRetiro));
+                                                    var fTotalIngresoNoAcumulableJPR = TotalIngresoNoAcumulableJPRNew += TotalIngresoNoAcumulableJPRExist;
+
+
+                                                    propertyIngresoNoAcumulableJPR.SetValue(oDataAcumulada.Nomina.oPercepciones.oJubilacionPensionRetiro, fTotalIngresoNoAcumulableJPR);
+
+                                                }
+                                            }
+                                            else
+                                                oDataAcumulada.Nomina.oPercepciones.oJubilacionPensionRetiro = oData.Nomina.oPercepciones.oJubilacionPensionRetiro;
+                                        }
+
+                                        // SeparacionIndemnizacion
+                                        if (oData.Nomina.oPercepciones.oSeparacionIndemnizacion != null)
+                                        {
+                                            if (oDataAcumulada != null)
+                                            {
+                                                oDataAcumulada.Nomina.oPercepciones.oSeparacionIndemnizacion.fTotalPagado00 = oData.Nomina.oPercepciones.oSeparacionIndemnizacion.fTotalPagado00;
+                                                oDataAcumulada.Nomina.oPercepciones.oSeparacionIndemnizacion.iNumAniosServicio00 = oData.Nomina.oPercepciones.oSeparacionIndemnizacion.iNumAniosServicio00;
+                                                oDataAcumulada.Nomina.oPercepciones.oSeparacionIndemnizacion.fUltimoSueldoMensOrd00 = oData.Nomina.oPercepciones.oSeparacionIndemnizacion.fUltimoSueldoMensOrd00;
+                                                oDataAcumulada.Nomina.oPercepciones.oSeparacionIndemnizacion.fIngresoAcumulable00 = oData.Nomina.oPercepciones.oSeparacionIndemnizacion.fIngresoAcumulable00;
+                                                oDataAcumulada.Nomina.oPercepciones.oSeparacionIndemnizacion.fIngresoNoAcumulable00 = oData.Nomina.oPercepciones.oSeparacionIndemnizacion.fIngresoNoAcumulable00;
+
+                                                string propTotalPagado = $"fTotalPagado{sMes:D2}";
+                                                string propNumAniosServicio = $"iNumAniosServicio{sMes:D2}";
+                                                string propUltimoSueldoMensOrd = $"fUltimoSueldoMensOrd{sMes:D2}";
+                                                string propIngresoAcumulableSI = $"fIngresoAcumulable{sMes:D2}";
+                                                string propIngresoNoAcumulableSI = $"fIngresoNoAcumulable{sMes:D2}";
+
+                                                var typeSI = typeof(SeparacionIndemnizacionMBDB);
+                                                var propertyTotalPagado = typeSI.GetProperty(propTotalPagado);
+                                                var propertyNumAniosServicio = typeSI.GetProperty(propNumAniosServicio);
+                                                var propertyUltimoSueldoMensOrd = typeSI.GetProperty(propUltimoSueldoMensOrd);
+                                                var propertyIngresoAcumulableSI = typeSI.GetProperty(propIngresoAcumulableSI);
+                                                var propertyIngresoNoAcumulableSI = typeSI.GetProperty(propIngresoNoAcumulableSI);
+
+                                                if (propertyTotalPagado != null)
+                                                {
+
+                                                    var TotalExentoNew = Convert.ToDecimal(propertyTotalPagado.GetValue(oData.Nomina.oPercepciones.oSeparacionIndemnizacion));
+                                                    var TotalExentoExist = Convert.ToDecimal(propertyTotalPagado.GetValue(oDataAcumulada.Nomina.oPercepciones.oSeparacionIndemnizacion));
+
+                                                    var fTotalExento = TotalExentoNew += TotalExentoExist;
+                                                    propertyTotalPagado.SetValue(oDataAcumulada.Nomina.oPercepciones.oSeparacionIndemnizacion, fTotalExento);
+                                                }
+
+                                                if (propertyNumAniosServicio != null)
+                                                {
+                                                    var NumAniosServicioNew = Convert.ToInt32(propertyNumAniosServicio.GetValue(oData.Nomina.oPercepciones.oSeparacionIndemnizacion));
+                                                    var NumAniosServicioExist = Convert.ToInt32(propertyNumAniosServicio.GetValue(oDataAcumulada.Nomina.oPercepciones.oSeparacionIndemnizacion));
+
+                                                    var iNumAniosServicio = NumAniosServicioNew += NumAniosServicioExist;
+                                                    propertyNumAniosServicio.SetValue(oDataAcumulada.Nomina.oPercepciones.oSeparacionIndemnizacion, iNumAniosServicio);
+                                                }
+
+                                                if (propertyUltimoSueldoMensOrd != null)
+                                                {
+                                                    var TotalUltimosSueldosMensOrdNew = Convert.ToDecimal(propertyUltimoSueldoMensOrd.GetValue(oData.Nomina.oPercepciones.oSeparacionIndemnizacion));
+                                                    var TotalUltimosSueldosMensOrdExist = Convert.ToDecimal(propertyUltimoSueldoMensOrd.GetValue(oDataAcumulada.Nomina.oPercepciones.oSeparacionIndemnizacion));
+                                                    var fTotalUltimoSueldoMesOrd = TotalUltimosSueldosMensOrdNew += TotalUltimosSueldosMensOrdExist;
+                                                    propertyUltimoSueldoMensOrd.SetValue(oDataAcumulada.Nomina.oPercepciones.oSeparacionIndemnizacion, fTotalUltimoSueldoMesOrd);
+
+                                                }
+
+                                                if (propertyIngresoAcumulableSI != null)
+                                                {
+                                                    var TotalIngresoAcumulableNew = Convert.ToDecimal(propertyIngresoAcumulableSI.GetValue(oData.Nomina.oPercepciones.oSeparacionIndemnizacion));
+                                                    var TotalIngresoAcumulableExist = Convert.ToDecimal(propertyIngresoAcumulableSI.GetValue(oDataAcumulada.Nomina.oPercepciones.oSeparacionIndemnizacion));
+                                                    var fIngresoAcumulableSI = TotalIngresoAcumulableNew += TotalIngresoAcumulableExist;
+
+                                                    propertyIngresoAcumulableSI.SetValue(oDataAcumulada.Nomina.oPercepciones.oSeparacionIndemnizacion, fIngresoAcumulableSI);
+
+                                                }
+
+                                                if (propertyIngresoNoAcumulableSI != null)
+                                                {
+                                                    var TotalIngresoNoAcumulableNew = Convert.ToDecimal(propertyIngresoNoAcumulableSI.GetValue(oData.Nomina.oPercepciones.oSeparacionIndemnizacion));
+                                                    var TotalIngresoNoAcumulableExist = Convert.ToDecimal(propertyIngresoNoAcumulableSI.GetValue(oDataAcumulada.Nomina.oPercepciones.oSeparacionIndemnizacion));
+                                                    var fTotalIngresoNoAcumulableSI = TotalIngresoNoAcumulableNew += TotalIngresoNoAcumulableExist;
+                                                    propertyIngresoNoAcumulableSI.SetValue(oDataAcumulada.Nomina.oPercepciones.oSeparacionIndemnizacion, fTotalIngresoNoAcumulableSI);
+
+                                                }
+                                            }
+                                            else
+                                                oDataAcumulada.Nomina.oPercepciones.oSeparacionIndemnizacion = oData.Nomina.oPercepciones.oSeparacionIndemnizacion;
+                                        }
+
+                                    }
+
+                                    // Deducciones
+                                    if (oData.Nomina.oDeducciones != null)
+                                    {
+
+                                        oDataAcumulada.Nomina.oDeducciones.TotalOtrasDeducciones00 += oData.Nomina.oDeducciones.TotalOtrasDeducciones00;
+                                        oDataAcumulada.Nomina.oDeducciones.TotalImpuestosRetenidos00 += oData.Nomina.oDeducciones.TotalImpuestosRetenidos00;
+
+                                        string propTotalOtrosDeducciones = $"TotalOtrasDeducciones{sMes:D2}";
+                                        string propTotalImpuestosRetenidos = $"TotalImpuestosRetenidos{sMes:D2}";
+
+                                        var typeDeducciones = typeof(DeduccionesMBDB);
+                                        var propertyTotalOtrasDeducciones = typeDeducciones.GetProperty(propTotalOtrosDeducciones);
+                                        var propertyTotalImpuestosRetenido = typeDeducciones.GetProperty(propTotalImpuestosRetenidos);
+
+                                        if (propertyTotalOtrasDeducciones != null)
+                                        {
+
+                                            var TotalOtrasDeduccionesNew = Convert.ToDecimal(propertyTotalOtrasDeducciones.GetValue(oData.Nomina.oDeducciones));
+                                            var TotalOtrasDeduccionesExist = Convert.ToDecimal(propertyTotalOtrasDeducciones.GetValue(oDataAcumulada.Nomina.oDeducciones));
+
+                                            var TotalTotalOtrasDeducciones = TotalOtrasDeduccionesNew += TotalOtrasDeduccionesExist;
+                                            propertyTotalOtrasDeducciones.SetValue(oDataAcumulada.Nomina.oDeducciones, TotalTotalOtrasDeducciones);
+                                        }
+
+
+                                        if (propertyTotalImpuestosRetenido != null)
+                                        {
+
+                                            var TotalImpuestosRetenidosNew = Convert.ToDecimal(propertyTotalImpuestosRetenido.GetValue(oData.Nomina.oDeducciones));
+                                            var TotalImpuestosRetenidosExist = Convert.ToDecimal(propertyTotalImpuestosRetenido.GetValue(oDataAcumulada.Nomina.oDeducciones));
+
+                                            var TotalTotalImpuestosRetenidos = TotalImpuestosRetenidosNew += TotalImpuestosRetenidosExist;
+                                            propertyTotalImpuestosRetenido.SetValue(oDataAcumulada.Nomina.oDeducciones, TotalTotalImpuestosRetenidos);
+                                        }
+
+                                        if (oData.Nomina.oDeducciones.lsDeduccion != null && oData.Nomina.oDeducciones.lsDeduccion.Count > 0)
+                                            oDataAcumulada.Nomina.oDeducciones.lsDeduccion.AddRange(oData.Nomina.oDeducciones.lsDeduccion);
+                                    }
+
+                                    // OtrosPagos
+                                    if (oData.Nomina.oOtrosPagos != null)
+                                    {
+                                        oDataAcumulada.Nomina.oOtrosPagos.fImporteTotal00 += oData.Nomina.oOtrosPagos.fImporteTotal00;
+                                        oDataAcumulada.Nomina.oOtrosPagos.fSubsidioCausadoTotal00 += oData.Nomina.oOtrosPagos.fSubsidioCausadoTotal00;
+
+                                        string propImporteTotal = $"fImporteTotal{sMes:D2}";
+                                        string propSubsidioCausadoTotal = $"fSubsidioCausadoTotal{sMes:D2}";
+
+                                        var type = typeof(OtrosPagosMBDB);
+                                        var propertyImporteTotal = type.GetProperty(propImporteTotal);
+                                        var propertySubsidioCausadoTotal = type.GetProperty(propSubsidioCausadoTotal);
+
+                                        if (propertyImporteTotal != null)
+                                        {
+                                            var fImporteExist = Convert.ToDecimal(propertyImporteTotal.GetValue(oDataAcumulada.Nomina.oOtrosPagos));
+                                            var fImporteNew = Convert.ToDecimal(propertyImporteTotal.GetValue(oData.Nomina.oOtrosPagos));
+                                            var ImporteSuma = fImporteExist += fImporteNew;
+                                            propertyImporteTotal.SetValue(oDataAcumulada.Nomina.oOtrosPagos, ImporteSuma);
+
+                                        }
+
+                                        if (propertySubsidioCausadoTotal != null)
+                                        {
+                                            var fSubsidioExist = Convert.ToDecimal(propertySubsidioCausadoTotal.GetValue(oDataAcumulada.Nomina.oOtrosPagos));
+                                            var fSubsidioNew = Convert.ToDecimal(propertySubsidioCausadoTotal.GetValue(oData.Nomina.oOtrosPagos));
+                                            var SubsidioSuma = fSubsidioExist += fSubsidioNew;
+                                            propertyImporteTotal.SetValue(oDataAcumulada.Nomina.oOtrosPagos, SubsidioSuma);
+
+                                        }
+
+
+                                        // OtroPago                                      
+                                        if (oData.Nomina.oOtrosPagos.lsOtroPago != null && oData.Nomina.oOtrosPagos.lsOtroPago.Count > 0)
+                                            oDataAcumulada.Nomina.oOtrosPagos.lsOtroPago.AddRange(oData.Nomina.oOtrosPagos.lsOtroPago);
+
+
+
+                                        // CompensacionSaldoAfavor
+                                        if (oData.Nomina.oOtrosPagos.oCompensacionSaldoAFavor != null)
+                                        {
+                                            if (oDataAcumulada.Nomina.oOtrosPagos.oCompensacionSaldoAFavor != null)
+                                            {
+                                                oDataAcumulada.Nomina.oOtrosPagos.oCompensacionSaldoAFavor.fRemanenteSalFav00 = oData.Nomina.oOtrosPagos.oCompensacionSaldoAFavor.fRemanenteSalFav00;
+                                                oDataAcumulada.Nomina.oOtrosPagos.oCompensacionSaldoAFavor.fSaldoAFavor00 = oData.Nomina.oOtrosPagos.oCompensacionSaldoAFavor.fSaldoAFavor00;
+
+
+                                                string propRemanenteSalFav = $"fRemanenteSalFav{sMes}";
+                                                string propSaldoAFavor = $"fSaldoAFavor{sMes}";
+
+                                                var typeCSAF = typeof(CompensacionSaldoAFavorMBDB);
+                                                var propertyRemanenteSalFav = typeCSAF.GetProperty(propRemanenteSalFav);
+                                                var propertySaldoFavor = typeCSAF.GetProperty(propSaldoAFavor);
+
+                                                if (propertyRemanenteSalFav != null)
+                                                {
+                                                    var fRemanenteSaldoAFavNew = Convert.ToDecimal(propertyRemanenteSalFav.GetValue(oData.Nomina.oOtrosPagos.oCompensacionSaldoAFavor));
+                                                    var fRemanenteSaldoAFavExist = Convert.ToDecimal(propertyRemanenteSalFav.GetValue(oDataAcumulada.Nomina.oOtrosPagos.oCompensacionSaldoAFavor));
+
+                                                    var fRemanenteSalFav = fRemanenteSaldoAFavNew += fRemanenteSaldoAFavExist;
+                                                    propertyRemanenteSalFav.SetValue(oDataAcumulada.Nomina.oOtrosPagos.oCompensacionSaldoAFavor, fRemanenteSalFav);
+                                                }
+
+                                                if (propertySaldoFavor != null)
+                                                {
+                                                    var fSaldoAFavorNew = Convert.ToDecimal(propertySaldoFavor.GetValue(oData.Nomina.oOtrosPagos.oCompensacionSaldoAFavor));
+                                                    var fSaldoAFavorExist = Convert.ToDecimal(propertySaldoFavor.GetValue(oDataAcumulada.Nomina.oOtrosPagos.oCompensacionSaldoAFavor));
+
+                                                    var fSaldoAFavor = fSaldoAFavorNew += fSaldoAFavorExist;
+                                                    propertyRemanenteSalFav.SetValue(oDataAcumulada.Nomina.oOtrosPagos.oCompensacionSaldoAFavor, fSaldoAFavor);
+                                                }
+                                            }
+                                            else
+                                                oDataAcumulada.Nomina.oOtrosPagos.oCompensacionSaldoAFavor = oData.Nomina.oOtrosPagos.oCompensacionSaldoAFavor;
+                                        }
+
+
+                                        // SubsidioAlEmpleo
+                                        if (oData.Nomina.oOtrosPagos.oSubsidioAlEmpleo != null)
+                                        {
+                                            if (oDataAcumulada.Nomina.oOtrosPagos.oSubsidioAlEmpleo != null)
+                                            {
+                                                oDataAcumulada.Nomina.oOtrosPagos.oSubsidioAlEmpleo.fSubsidioCausado00 = oData.Nomina.oOtrosPagos.oSubsidioAlEmpleo.fSubsidioCausado00;
+
+                                                string propSubsidioCausado = $"fSubsidioCausado{sMes}";
+
+                                                var typeSAE = typeof(SubsidioAlEmpleoMBDB);
+                                                var propertySubsidioCausado = typeSAE.GetProperty(propSubsidioCausado);
+
+                                                if (propertySubsidioCausado != null)
+                                                {
+
+                                                    var SubsidioCausado = Convert.ToDecimal(propertySubsidioCausado.GetValue(oData.Nomina.oOtrosPagos.oSubsidioAlEmpleo));
+                                                    var SubsidioCausadoExist = Convert.ToDecimal(propertySubsidioCausado.GetValue(oDataAcumulada.Nomina.oOtrosPagos.oSubsidioAlEmpleo));
+
+                                                    var fSubsidioCausado = SubsidioCausado += SubsidioCausadoExist;
+                                                    propertySubsidioCausado.SetValue(oDataAcumulada.Nomina.oOtrosPagos.oSubsidioAlEmpleo, fSubsidioCausado);
+                                                }
+
+                                            }
+                                            else
+                                                oDataAcumulada.Nomina.oOtrosPagos.oSubsidioAlEmpleo = oData.Nomina.oOtrosPagos.oSubsidioAlEmpleo;
+                                        }
+
+                                    }
+
+                                    // Incapacidades
+                                    if (oData.Nomina.oIncapacidades != null)
+                                    {
+                                        oDataAcumulada.Nomina.oIncapacidades.fImporteTotal00 += oData.Nomina.oIncapacidades.fImporteTotal00;
+                                        oDataAcumulada.Nomina.oIncapacidades.iDiasIncapacidadTotal00 += oData.Nomina.oIncapacidades.iDiasIncapacidadTotal00;
+
+                                        string propImporteTotal = $"fImporteTotal{sMes:D2}";
+                                        string propImporteDiasIncapacdiad = $"iDiasIncapacidadTotal{sMes:D2}";
+
+                                        var type = typeof(IncapacidadesMBDB);
+                                        var propertyImporteTotal = type.GetProperty(propImporteTotal);
+                                        var propertyDiasIncapacidadTotal = type.GetProperty(propImporteDiasIncapacdiad);
+
+                                        if (propertyImporteTotal != null)
+                                        {
+                                            var fImporteExist = Convert.ToDecimal(propertyImporteTotal.GetValue(oDataAcumulada.Nomina.oIncapacidades));
+                                            var fImporteNew = Convert.ToDecimal(propertyImporteTotal.GetValue(oData.Nomina.oIncapacidades));
+                                            var ImporteSuma = fImporteExist += fImporteNew;
+                                            propertyImporteTotal.SetValue(oDataAcumulada.Nomina.oIncapacidades, ImporteSuma);
+
+                                        }
+
+
+                                        if (propertyDiasIncapacidadTotal != null)
+                                        {
+                                            var DiasIncapacidadExist = Convert.ToInt32(propertyDiasIncapacidadTotal.GetValue(oDataAcumulada.Nomina.oIncapacidades));
+                                            var DiasIncapacidadNew = Convert.ToInt32(propertyDiasIncapacidadTotal.GetValue(oData.Nomina.oIncapacidades));
+                                            var DiasIncapacidadSuma = DiasIncapacidadExist += DiasIncapacidadNew;
+                                            propertyDiasIncapacidadTotal.SetValue(oDataAcumulada.Nomina.oIncapacidades, DiasIncapacidadSuma);
+
+                                        }
+
+                                        // Incapacidad
+                                        if (oData.Nomina.oIncapacidades.lsIncapacidad != null && oData.Nomina.oIncapacidades.lsIncapacidad.Count > 0)
+                                            oDataAcumulada.Nomina.oIncapacidades.lsIncapacidad.AddRange(oData.Nomina.oIncapacidades.lsIncapacidad);
+
+                                    }
+                                }
+                            }
+
+                            if (oDataAcumulada == null) continue;
+
+                            if (docExiste != null)
+                            {
+                                var arrayFilters = new List<ArrayFilterDefinition>();
+                                var updatesParaCombinar = new List<UpdateDefinition<mdl_NAcumulados>>();
+
+
+                                var updateBuilder = Builders<mdl_NAcumulados>.Update
+                                    .Inc("Nomina.TotalPercepciones00", new BsonDecimal128(Convert.ToDecimal(oDataAcumulada.Nomina.fTotalPercepciones00)))
+                                    .Inc("Nomina.TotalDeducciones00", new BsonDecimal128(Convert.ToDecimal(oDataAcumulada.Nomina.fTotalDeducciones00)))
+                                    .Inc("Nomina.TotalOtrosPagos00", new BsonDecimal128(Convert.ToDecimal(oDataAcumulada.Nomina.fTotalOtrosPagos00)))
+                                    .Inc("Nomina.NetoTotal00", new BsonDecimal128(Convert.ToDecimal(oDataAcumulada.Nomina.fNetoTotal00)))
+                                    .Inc($"Nomina.TotalPercepciones{sMes:D2}", new BsonDecimal128(Convert.ToDecimal(oDataAcumulada.Nomina.fTotalPercepciones00)))
+                                    .Inc($"Nomina.TotalDeducciones{sMes:D2}", new BsonDecimal128(Convert.ToDecimal(oDataAcumulada.Nomina.fTotalDeducciones00)))
+                                    .Inc($"Nomina.TotalOtrosPagos{sMes:D2}", new BsonDecimal128(Convert.ToDecimal(oDataAcumulada.Nomina.fTotalOtrosPagos00)))
+                                    .Inc($"Nomina.NetoTotal{sMes:D2}", new BsonDecimal128(Convert.ToDecimal(oDataAcumulada.Nomina.fNetoTotal00)))
+                                    .PushEach(doc => doc.lsUUID, oDataAcumulada.lsUUID);
+
+                                /* Percepciones */
+                                if (oDataAcumulada.Nomina.oPercepciones != null)
+                                {
+                                    var oPercepciones = oDataAcumulada.Nomina.oPercepciones;
+                                    updateBuilder = updateBuilder
+                                        .Inc("Nomina.Percepciones.TotalSueldos00", new BsonDecimal128(Convert.ToDecimal(oPercepciones.fTotalSueldos00)))
+                                        .Inc("Nomina.Percepciones.TotalSeparacionIndemnizacion00", new BsonDecimal128(Convert.ToDecimal(oPercepciones.fTotalSeparacionIndemnizacion00)))
+                                        .Inc("Nomina.Percepciones.TotalJubilacionPensionRetiro00", new BsonDecimal128(Convert.ToDecimal(oPercepciones.fTotalJubilacionPensionRetiro00)))
+                                        .Inc("Nomina.Percepciones.TotalGravado00", new BsonDecimal128(Convert.ToDecimal(oPercepciones.fTotalGravado00)))
+                                        .Inc("Nomina.Percepciones.TotalExento00", new BsonDecimal128(Convert.ToDecimal(oPercepciones.fTotalExento00)))
+                                        .Inc($"Nomina.Percepciones.TotalSueldos{sMes:D2}", new BsonDecimal128(Convert.ToDecimal(oPercepciones.fTotalSueldos00)))
+                                        .Inc($"Nomina.Percepciones.TotalSeparacionIndemnizacion{sMes:D2}", new BsonDecimal128(Convert.ToDecimal(oPercepciones.fTotalSeparacionIndemnizacion00)))
+                                        .Inc($"Nomina.Percepciones.TotalJubilacionPensionRetiro{sMes:D2}", new BsonDecimal128(Convert.ToDecimal(oPercepciones.fTotalJubilacionPensionRetiro00)))
+                                        .Inc($"Nomina.Percepciones.TotalGravado{sMes:D2}", new BsonDecimal128(Convert.ToDecimal(oPercepciones.fTotalGravado00)))
+                                        .Inc($"Nomina.Percepciones.TotalExento{sMes:D2}", new BsonDecimal128(Convert.ToDecimal(oPercepciones.fTotalExento00)));
+
+
+                                    // Percepción
+                                    var lsClavesExistentesPercepciones = docExiste.Nomina?.oPercepciones?.lsPercepcion.Select(p => p.sClave).ToHashSet() ?? new HashSet<string>();
+                                    var nuevosConceptosP = new List<PercepcionMBDB>();
+
+                                    var contadorFiltrosP = 1;
+
+                                    foreach (var p in oPercepciones.lsPercepcion ?? new List<PercepcionMBDB>())
+                                    {
+                                        if (lsClavesExistentesPercepciones.Contains(p.sClave))
+                                        {
+                                            string sFiltro = $"elemp{contadorFiltrosP++}";
+
+                                            //sFiltro = $"elemp{contadorFiltros++}";
+                                            arrayFilters.Add(new BsonDocumentArrayFilterDefinition<BsonDocument>(new BsonDocument(sFiltro + ".Clave", p.sClave)));
+                                            updatesParaCombinar.Add(Builders<mdl_NAcumulados>.Update
+                                                .Inc($"Nomina.Percepciones.Percepcion.$[{sFiltro}].Gravado00", (double)p.fGravado00)
+                                                .Inc($"Nomina.Percepciones.Percepcion.$[{sFiltro}].Exento00", (double)p.fExento00)
+                                                .Inc($"Nomina.Percepciones.Percepcion.$[{sFiltro}].Gravado{sMes:D2}", (double)p.fGravado00)
+                                                .Inc($"Nomina.Percepciones.Percepcion.$[{sFiltro}].Exento{sMes:D2}", (double)p.fExento00));
+                                        }
+                                        else
+                                            nuevosConceptosP.Add(p);
+                                    }
+
+                                    if (nuevosConceptosP.Any())
+                                        updateBuilder = updateBuilder.PushEach("Nomina.Percepciones.Percepcion", nuevosConceptosP);
+
+                                    // AccionesOTitulos
+                                    if (oPercepciones.oAccionesOTitulos != null)
+                                    {
+                                        var oAccionesOTitulos = oDataAcumulada.Nomina.oPercepciones.oAccionesOTitulos;
+
+                                        updateBuilder = updateBuilder
+                                           .Inc("Nomina.Percepciones.AccionesOTitulos.ValorMercado00", new BsonDecimal128(Convert.ToDecimal(oPercepciones.oAccionesOTitulos.fValorMercado00)))
+                                           .Inc("Nomina.Percepciones.AccionesOTitulos.PrecioAlOtorgarse00", new BsonDecimal128(Convert.ToDecimal(oPercepciones.oAccionesOTitulos.fPrecioAlOtorgarse00)))
+                                           .Inc($"Nomina.Percepciones.AccionesOTitulos.ValorMercado{sMes:D2}", new BsonDecimal128(Convert.ToDecimal(oPercepciones.oAccionesOTitulos.fValorMercado00)))
+                                           .Inc($"Nomina.Percepciones.AccionesOTitulos.PrecioAlOtorgarse{sMes:D2}", new BsonDecimal128(Convert.ToDecimal(oPercepciones.oAccionesOTitulos.fPrecioAlOtorgarse00)));
+                                    }
+
+                                    // HorasExtra
+                                    if (oPercepciones.lsHorasExtra != null)
+                                    {
+                                        var lsClavesHorasExtraExistentes = docExiste.Nomina?.oPercepciones?.lsHorasExtra.Select(h => h.sTipoHoraExtra).ToHashSet() ?? new HashSet<string>();
+                                        var nuevasHorasExtra = new List<HorasExtraMBDB>();
+                                        var contadorFiltroHE = 1;
+                                        foreach (var h in oPercepciones.lsHorasExtra ?? new List<HorasExtraMBDB>())
+                                        {
+                                            if (lsClavesHorasExtraExistentes.Contains(h.sTipoHoraExtra))
+                                            {
+                                                string sFiltroHE = $"elemhe{contadorFiltroHE++}";
+                                                arrayFilters.Add(new BsonDocumentArrayFilterDefinition<BsonDocument>(new BsonDocument(sFiltroHE + ".Tipo", h.sTipoHoraExtra)));
+                                                updatesParaCombinar.Add(Builders<mdl_NAcumulados>.Update
+                                                    .Inc($"Nomina.Percepciones.HorasExtra.$[{sFiltroHE}].HoraExtra.ImportePagado00", new BsonDecimal128(Convert.ToDecimal(h.oHoraExtra.fImportePagado00)))
+                                                    .Inc($"Nomina.Percepciones.HorasExtra.$[{sFiltroHE}].HoraExtra.HorasExtra00", h.oHoraExtra.iHorasExtra00)
+                                                    .Inc($"Nomina.Percepciones.HorasExtra.$[{sFiltroHE}].HoraExtra.Dias00", h.oHoraExtra.iDias00)
+                                                    .Inc($"Nomina.Percepciones.HorasExtra.$[{sFiltroHE}].HoraExtra.ImportePagado{sMes:D2}", new BsonDecimal128(Convert.ToDecimal(h.oHoraExtra.fImportePagado00)))
+                                                    .Inc($"Nomina.Percepciones.HorasExtra.$[{sFiltroHE}].HoraExtra.HorasExtra{sMes:D2}", h.oHoraExtra.iHorasExtra00)
+                                                    .Inc($"Nomina.Percepciones.HorasExtra.$[{sFiltroHE}].HoraExtra.Dias{sMes:D2}", h.oHoraExtra.iDias00));
+                                            }
+                                            else
+                                            {
+                                                nuevasHorasExtra.Add(h);
+                                            }
+                                        }
+                                        if (nuevasHorasExtra.Any())
+                                        {
+                                            updateBuilder = updateBuilder.PushEach("Nomina.Percepciones.HorasExtra", nuevasHorasExtra);
+                                        }
+                                    }
+
+                                    // SeparacionIndemnizacion
+                                    if (oPercepciones.oSeparacionIndemnizacion != null)
+                                    {
+                                        updateBuilder = updateBuilder
+                                         .Inc("Nomina.Percepciones.SeparacionIndemnizacion.NumAniosServicio00", oPercepciones.oSeparacionIndemnizacion.iNumAniosServicio00)
+                                           .Inc("Nomina.Percepciones.SeparacionIndemnizacion.UltimoSueldoMensOrd00", new BsonDecimal128(Convert.ToDecimal(oPercepciones.oSeparacionIndemnizacion.fUltimoSueldoMensOrd00)))
+                                           .Inc("Nomina.Percepciones.SeparacionIndemnizacion.TotalPagado00", new BsonDecimal128(Convert.ToDecimal(oPercepciones.oSeparacionIndemnizacion.fTotalPagado00)))
+                                           .Inc("Nomina.Percepciones.SeparacionIndemnizacion.IngresoAcumulable00", new BsonDecimal128(Convert.ToDecimal(oPercepciones.oSeparacionIndemnizacion.fIngresoAcumulable00)))
+                                           .Inc("Nomina.Percepciones.SeparacionIndemnizacion.IngresoNoAcumulable00", new BsonDecimal128(Convert.ToDecimal(oPercepciones.oSeparacionIndemnizacion.fIngresoNoAcumulable00)))
+                                           .Inc($"Nomina.Percepciones.SeparacionIndemnizacion.NumAniosServicio{sMes:D2}", oPercepciones.oSeparacionIndemnizacion.iNumAniosServicio00)
+                                           .Inc($"Nomina.Percepciones.SeparacionIndemnizacion.UltimoSueldoMensOrd{sMes:D2}", new BsonDecimal128(Convert.ToDecimal(oPercepciones.oSeparacionIndemnizacion.fUltimoSueldoMensOrd00)))
+                                           .Inc($"Nomina.Percepciones.SeparacionIndemnizacion.TotalPagado{sMes:D2}", new BsonDecimal128(Convert.ToDecimal(oPercepciones.oSeparacionIndemnizacion.fTotalPagado00)))
+                                           .Inc($"Nomina.Percepciones.SeparacionIndemnizacion.IngresoAcumulable{sMes:D2}", new BsonDecimal128(Convert.ToDecimal(oPercepciones.oSeparacionIndemnizacion.fIngresoAcumulable00)))
+                                           .Inc($"Nomina.Percepciones.SeparacionIndemnizacion.IngresoNoAcumulable{sMes:D2}", new BsonDecimal128(Convert.ToDecimal(oPercepciones.oSeparacionIndemnizacion.fIngresoNoAcumulable00)));
+
+
+                                    }
+
+                                    // JubilacionPensionRetiro
+                                    if (oPercepciones.oJubilacionPensionRetiro != null)
+                                    {
+                                        updateBuilder = updateBuilder
+                                                .Inc("Nomina.Percepciones.JubilacionPensionRetiro.MontoDiario00", new BsonDecimal128(Convert.ToDecimal(oPercepciones.oJubilacionPensionRetiro.fMontoDiario00)))
+                                                .Inc("Nomina.Percepciones.JubilacionPensionRetiro.TotalUnaExhibicion00", new BsonDecimal128(Convert.ToDecimal(oPercepciones.oJubilacionPensionRetiro.fTotalUnaExhibicion00)))
+                                                .Inc("Nomina.Percepciones.JubilacionPensionRetiro.TotalParcialidad00", new BsonDecimal128(Convert.ToDecimal(oPercepciones.oJubilacionPensionRetiro.fTotalParcialidad00)))
+                                                .Inc("Nomina.Percepciones.JubilacionPensionRetiro.IngresoAcumulable00", new BsonDecimal128(Convert.ToDecimal(oPercepciones.oJubilacionPensionRetiro.fIngresoAcumulable00)))
+                                                .Inc("Nomina.Percepciones.JubilacionPensionRetiro.IngresoNoAcumulable00", new BsonDecimal128(Convert.ToDecimal(oPercepciones.oJubilacionPensionRetiro.fIngresoNoAcumulable00)))
+
+                                                .Inc($"Nomina.Percepciones.JubilacionPensionRetiro.MontoDiario{sMes:D2}", new BsonDecimal128(Convert.ToDecimal(oPercepciones.oJubilacionPensionRetiro.fMontoDiario00)))
+                                                .Inc($"Nomina.Percepciones.JubilacionPensionRetiro.TotalUnaExhibicion{sMes:D2}", new BsonDecimal128(Convert.ToDecimal(oPercepciones.oJubilacionPensionRetiro.fTotalUnaExhibicion00)))
+                                                .Inc($"Nomina.Percepciones.JubilacionPensionRetiro.TotalParcialidad{sMes:D2}", new BsonDecimal128(Convert.ToDecimal(oPercepciones.oJubilacionPensionRetiro.fTotalParcialidad00)))
+                                                .Inc($"Nomina.Percepciones.JubilacionPensionRetiro.IngresoAcumulable{sMes:D2}", new BsonDecimal128(Convert.ToDecimal(oPercepciones.oJubilacionPensionRetiro.fIngresoAcumulable00)))
+                                                .Inc($"Nomina.Percepciones.JubilacionPensionRetiro.IngresoNoAcumulable{sMes:D2}", new BsonDecimal128(Convert.ToDecimal(oPercepciones.oJubilacionPensionRetiro.fIngresoNoAcumulable00)));
+                                    }
+
+                                }
+
+
+                                /* Deducciones */
+                                if (oDataAcumulada.Nomina.oDeducciones != null)
+                                {
+                                    var oDeducciones = oDataAcumulada.Nomina.oDeducciones;
+                                    updateBuilder = updateBuilder
+                                        .Inc("Nomina.Deducciones.TotalOtrasDeducciones00", new BsonDecimal128(Convert.ToDecimal(oDeducciones.TotalOtrasDeducciones00)))
+                                        .Inc("Nomina.Deducciones.TotalImpuestosRetenidos00", new BsonDecimal128(Convert.ToDecimal(oDeducciones.TotalImpuestosRetenidos00)))
+                                        .Inc($"Nomina.Deducciones.TotalOtrasDeducciones{sMes:D2}", new BsonDecimal128(Convert.ToDecimal(oDeducciones.TotalOtrasDeducciones00)))
+                                        .Inc($"Nomina.Deducciones.TotalImpuestosRetenidos{sMes:D2}", new BsonDecimal128(Convert.ToDecimal(oDeducciones.TotalImpuestosRetenidos00)));
+
+                                    var lsClavesExistentesDeducciones = docExiste.Nomina?.oDeducciones?.lsDeduccion.Select(p => p.sClave).ToHashSet() ?? new HashSet<string>();
+                                    var nuevosConceptosD = new List<DeduccionMBDB>();
+
+                                    var contadorFiltros = 1;
+                                    foreach (var d in oDeducciones.lsDeduccion ?? new List<DeduccionMBDB>())
+                                    {
+                                        if (lsClavesExistentesDeducciones.Contains(d.sClave))
+                                        {
+                                            string sFiltro = $"elemd{contadorFiltros++}";
+                                            arrayFilters.Add(new BsonDocumentArrayFilterDefinition<BsonDocument>(new BsonDocument(sFiltro + ".Clave", d.sClave)));
+                                            updatesParaCombinar.Add(Builders<mdl_NAcumulados>.Update
+                                                .Inc($"Nomina.Deducciones.Deduccion.$[{sFiltro}].Importe00", new BsonDecimal128(Convert.ToDecimal(d.fImporte00)))
+                                                .Inc($"Nomina.Deducciones.Deduccion.$[{sFiltro}].Importe{sMes:D2}", new BsonDecimal128(Convert.ToDecimal(d.fImporte00))));
+                                        }
+                                        else
+                                        {
+                                            nuevosConceptosD.Add(d);
+                                        }
+                                    }
+
+                                    if (nuevosConceptosD.Any())
+                                        updateBuilder = updateBuilder.PushEach("Nomina.Deducciones.Deduccion", nuevosConceptosD);
+                                }
+
+
+                                /* OtrosPagos */
+                                if (oDataAcumulada.Nomina.oOtrosPagos != null)
+                                {
+                                    var oOtrosPagos = oDataAcumulada.Nomina.oOtrosPagos;
+                                    updateBuilder = updateBuilder
+                                        .Inc("Nomina.OtrosPagos.ImporteTotal00", new BsonDecimal128(Convert.ToDecimal(oOtrosPagos.fImporteTotal00)))
+                                        .Inc("Nomina.OtrosPagos.SubsidioCausadoTotal00", new BsonDecimal128(Convert.ToDecimal(oOtrosPagos.fSubsidioCausadoTotal00)))
+                                        .Inc($"Nomina.OtrosPagos.ImporteTotal{sMes:D2}", new BsonDecimal128(Convert.ToDecimal(oOtrosPagos.fImporteTotal00)))
+                                        .Inc($"Nomina.OtrosPagos.SubsidioCausadoTotal{sMes:D2}", new BsonDecimal128(Convert.ToDecimal(oOtrosPagos.fSubsidioCausadoTotal00)));
+
+                                    var lsClavesExistentesOtroPagos = docExiste.Nomina?.oOtrosPagos?.lsOtroPago.Select(p => p.sClave).ToHashSet() ?? new HashSet<string>();
+                                    var nuevosConceptosO = new List<OtroPagoMBDB>();
+                                    var contadorFiltros = 1;
+                                    foreach (var o in oOtrosPagos.lsOtroPago ?? new List<OtroPagoMBDB>())
+                                    {
+                                        if (lsClavesExistentesOtroPagos.Contains(o.sClave))
+                                        {
+                                            string sFiltro = $"elemo{contadorFiltros++}";
+                                            arrayFilters.Add(new BsonDocumentArrayFilterDefinition<BsonDocument>(new BsonDocument(sFiltro + ".Clave", o.sClave)));
+                                            updatesParaCombinar.Add(Builders<mdl_NAcumulados>.Update
+                                                .Inc($"Nomina.OtrosPagos.OtroPago.$[{sFiltro}].Importe00", new BsonDecimal128(Convert.ToDecimal(o.fImporte00)))
+                                                .Inc($"Nomina.OtrosPagos.OtroPago.$[{sFiltro}].Importe{sMes:D2}", new BsonDecimal128(Convert.ToDecimal(o.fImporte00)))); ;
+                                        }
+                                        else { nuevosConceptosO.Add(o); }
+
+                                    }
+
+                                    if (nuevosConceptosO.Any())
+                                        updateBuilder = updateBuilder.PushEach("Nomina.OtrosPagos.OtroPago", nuevosConceptosO);
+
+                                    if (oOtrosPagos.oCompensacionSaldoAFavor != null)
+                                    {
+                                        updateBuilder = updateBuilder
+                                            .Inc("Nomina.OtrosPagos.CompensacionSaldoAFavor.SaldoAFavor00", new BsonDecimal128(Convert.ToDecimal(oOtrosPagos.oCompensacionSaldoAFavor?.fSaldoAFavor00)))
+                                            .Inc("Nomina.OtrosPagos.CompensacionSaldoAFavor.RemanenteSalFav00", new BsonDecimal128(Convert.ToDecimal(oOtrosPagos.oCompensacionSaldoAFavor?.fRemanenteSalFav00)))
+                                            .Inc($"Nomina.OtrosPagos.CompensacionSaldoAFavor.Anio{sMes:D2}", oOtrosPagos.oCompensacionSaldoAFavor?.iAnio01 != null ? oOtrosPagos.oCompensacionSaldoAFavor.iAnio01 : 0000)
+                                            .Inc($"Nomina.OtrosPagos.CompensacionSaldoAFavor.SaldoAFavor{sMes:D2}", new BsonDecimal128(Convert.ToDecimal(oOtrosPagos.oCompensacionSaldoAFavor?.fSaldoAFavor00)))
+                                            .Inc($"Nomina.OtrosPagos.CompensacionSaldoAFavor.RemanenteSalFav{sMes:D2}", new BsonDecimal128(Convert.ToDecimal(oOtrosPagos.oCompensacionSaldoAFavor?.fRemanenteSalFav00)));
+                                    }
+
+
+                                    if (oOtrosPagos.oSubsidioAlEmpleo != null)
+                                    {
+                                        updateBuilder = updateBuilder
+                                             .Inc("Nomina.OtrosPagos.SubsidioAlEmpleo.SubsidioCausado00", new BsonDecimal128(Convert.ToDecimal(oOtrosPagos.oSubsidioAlEmpleo.fSubsidioCausado00)))
+                                            .Inc($"Nomina.OtrosPagos.SubsidioAlEmpleo.SubsidioCausado{sMes:D2}", new BsonDecimal128(Convert.ToDecimal(oOtrosPagos.oSubsidioAlEmpleo.fSubsidioCausado00)));
+                                    }
+
+
+                                }
+
+                                /* Incapacidades */
+                                if (oDataAcumulada.Nomina.oIncapacidades != null)
+                                {
+                                    var oIncapacidades = oDataAcumulada.Nomina.oIncapacidades;
+
+                                    updateBuilder = updateBuilder
+                                         .Inc("Nomina.Incapacidades.DiasIncapacidadTotal00", oIncapacidades.iDiasIncapacidadTotal00)
+                                         .Inc("Nomina.Incapacidades.ImporteTotal00", new BsonDecimal128(Convert.ToDecimal(oIncapacidades.fImporteTotal00)))
+                                         .Inc($"Nomina.Incapacidades.DiasIncapacidadTotal{sMes:D2}", oIncapacidades.iDiasIncapacidadTotal00)
+                                         .Inc($"Nomina.Incapacidades.ImporteTotal{sMes:D2}", new BsonDecimal128(Convert.ToDecimal(oIncapacidades.fImporteTotal00)));
+
+                                    var lsClavesExistentesIncapacidades = docExiste.Nomina?.oIncapacidades?.lsIncapacidad.Select(inc => inc.sTipoIncapacidad).ToHashSet() ?? new HashSet<string>();
+                                    var nuevosConceptosP = new List<IncapacidadMBDB>();
+                                    var contadorFiltrosI = 1;
+                                    foreach (var n in oIncapacidades.lsIncapacidad ?? new List<IncapacidadMBDB>())
+                                    {
+                                        if (lsClavesExistentesIncapacidades.Contains(n.sTipoIncapacidad))
+                                        {
+                                            string sFiltro = $"elemi{contadorFiltrosI++}";
+
+                                            updatesParaCombinar.Add(Builders<mdl_NAcumulados>.Update
+                                                .Inc($"Nomina.Incapacidades.Incapacidad.$[{sFiltro}].DiasIncapacidad00", n.iDiasIncapacidad00)
+                                                .Inc($"Nomina.Incapacidades.Incapacidad.$[{sFiltro}].Importe00", new BsonDecimal128(Convert.ToDecimal(n.fImporte00)))
+                                                .Inc($"Nomina.Incapacidades.Incapacidad.$[{sFiltro}].DiasIncapacidad{sMes:D2}", n.iDiasIncapacidad00)
+                                                .Inc($"Nomina.Incapacidades.Incapacidad.$[{sFiltro}].Importe{sMes:D2}", new BsonDecimal128(Convert.ToDecimal(n.fImporte00))));
+                                        }
+                                    }
+                                }
+
+
+
+                                updatesParaCombinar.Insert(0, updateBuilder);
+                                var combinedUpdate = Builders<mdl_NAcumulados>.Update.Combine(updatesParaCombinar);
+                                var filter = Builders<mdl_NAcumulados>.Filter.Eq(doc => doc.sRFC, rfc);
+                                var updateModel = new UpdateOneModel<mdl_NAcumulados>(filter, combinedUpdate);
+
+                                if (arrayFilters.Any())
+                                {
+                                    updateModel.ArrayFilters = arrayFilters;
+                                }
+                                operacionesBulk.Add(updateModel);
+                            }
+                            else
+                            {
+                                operacionesBulk.Add(new InsertOneModel<mdl_NAcumulados>(oDataAcumulada));
+                            }
+
+
+                        }
+
+                        if (operacionesBulk.Any())
+                        {
+                            await _NAcumuladosCollection.BulkWriteAsync(operacionesBulk);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+            }
+
+
+        }
